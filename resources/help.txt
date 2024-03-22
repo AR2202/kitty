@@ -1,0 +1,15 @@
+please enter your code
+you can do arithmetic expressions
+like addition and multiplication, e.g. 
+2 + 3 * (4 + 1)
+or you can define variables like
+myvariable = 5
+and use the variable later
+myvariable * 3 
+you can use decimal numbers, e.g.
+mydecimal = 0.56
+but you can't add decimal numbers to whole numbers
+this won't work:
+mydecimal + 2
+but this will:
+mydecimal + 2.0
