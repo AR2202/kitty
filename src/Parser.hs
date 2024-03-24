@@ -129,7 +129,11 @@ boolop = andop <|> xorop <|> orop
 
 -- | parsing boolean operations with left association
 boolopParser :: Parser BoolExpr
-boolopParser = chainl1 (try notParser <|> try falseParser <|> try trueParser <|> boolvarParser) boolop
+boolopParser = chainl1 (try notParser <|> try falseParser <|>  trueParser ) boolop
+
+-- | parsing boolean operations with left association
+boolopvarParser :: Parser BoolExpr
+boolopvarParser = chainl1 (try notParser <|> try falseParser <|> try trueParser <|> boolvarParser) boolop
 
 -- | parse variables
 boolvarParser :: Parser BoolExpr
@@ -139,7 +143,7 @@ boolvarParser = Var <$> (spaces *> many1 alphaNum <* spaces)
 
 -- | assigning variables
 assignmentParser :: Parser Definition
-assignmentParser = AssignDef <$> (spaces *> many1 alphaNum <* spaces) <* (char '=' >> noneOf "=<>") <*> (spaces *> astArithParser <* spaces)
+assignmentParser = AssignDef <$> (spaces *> many1 alphaNum <* spaces) <* (char '=' >> noneOf "=<>") <*> (spaces *> (try astBoolParser <|> try astArithParser <|> astBoolVarParser) <* spaces)
 
 -- | parses assignment as DefType variant of AST
 astAssignParser :: Parser KittyAST
@@ -148,14 +152,16 @@ astAssignParser = DefType <$> assignmentParser
 -- | parses assignment as DefType variant of AST
 astBoolParser :: Parser KittyAST
 astBoolParser = Boolean <$> boolParser
-
+-- | parses assignment as DefType variant of AST
+astBoolVarParser :: Parser KittyAST
+astBoolVarParser = Boolean <$> boolopvarParser
 -- | parse variables
 varParser :: Parser ArithExpr
 varParser = Variable <$> (spaces *> many1 alphaNum <* spaces)
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try astAssignParser <|> try astBoolParser <|> astArithParser
+astParser = try astAssignParser <|> try astBoolParser <|> try astArithParser <|> astBoolVarParser
 
 {- helper function to test parsing in the console-}
 
