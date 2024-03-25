@@ -1,9 +1,11 @@
 module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput) where
 
 import Data.Bits (Bits (xor))
+import Data.Functor.Contravariant (Comparison)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Evaluator (initialEnv)
+import Foreign.C (eNODEV)
 import KittyTypes
 import KittyTypes (ArithExpr, KittyAST, KittyError)
 import Parser
@@ -17,6 +19,7 @@ instance TypeCheckable KittyAST where
   typeOf (Boolean e) env = typeOf e env
   typeOf (StrLit s) _ = Right KString
   typeOf (DefType d) env = typeOf d env
+  typeOf (Comp c) env = typeOf c env
 
 instance TypeCheckable ArithExpr where
   typeOf (IntLit i) _ = Right KInt
@@ -62,6 +65,38 @@ instance TypeCheckable BoolExpr where
         Nothing -> Left $ DoesNotExistError ("no variable named " ++ s)
         Just val -> Right val
   typeOf (FCall fc) env = typeOf fc env
+
+instance TypeCheckable CompOp where
+  typeOf (Equal e1 e2) env
+    | typeOf e1 env == typeOf e2 env = Right KBool
+    | otherwise = Left $ TypeError $ "type mismatch: value of type " ++ show (typeOf e1 env) ++ " can't be compared"
+  typeOf (NotEqual e1 e2) env
+    | typeOf e1 env == typeOf e2 env = Right KBool
+    | otherwise = Left $ TypeError $ "type mismatch: value of type " ++ show (typeOf e1 env) ++ " can't be compared"
+  typeOf (Less e1 e2) env
+    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ show (typeOf e1 env) ++ " can't be compared"
+    | typeOf e1 env == Right KInt = Right KBool
+    | typeOf e1 env == Right KFloat = Right KBool
+    | typeOf e1 env == Right KString = Right KBool
+    | otherwise = Left $ TypeError $ "type  " ++ show (typeOf e1 env) ++ " can't be ordered, and < can't be used on this type"
+  typeOf (Greater e1 e2) env
+    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ show (typeOf e1 env) ++ " can't be compared"
+    | typeOf e1 env == Right KInt = Right KBool
+    | typeOf e1 env == Right KFloat = Right KBool
+    | typeOf e1 env == Right KString = Right KBool
+    | otherwise = Left $ TypeError $ "type  " ++ show (typeOf e1 env) ++ " can't be ordered, and > can't be used on this type"
+  typeOf (LessEq e1 e2) env
+    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ show (typeOf e1 env) ++ " can't be compared"
+    | typeOf e1 env == Right KInt = Right KBool
+    | typeOf e1 env == Right KFloat = Right KBool
+    | typeOf e1 env == Right KString = Right KBool
+    | otherwise = Left $ TypeError $ "type  " ++ show (typeOf e1 env) ++ " can't be ordered, and <= can't be used on this type"
+  typeOf (GreaterEq e1 e2) env
+    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ show (typeOf e1 env) ++ " can't be compared"
+    | typeOf e1 env == Right KInt = Right KBool
+    | typeOf e1 env == Right KFloat = Right KBool
+    | typeOf e1 env == Right KString = Right KBool
+    | otherwise = Left $ TypeError $ "type  " ++ show (typeOf e1 env) ++ " can't be ordered, and >= can't be used on this type"
 
 -- | parsers and type checks
 typeCheck :: Env -> T.Text -> Either KittyError KType

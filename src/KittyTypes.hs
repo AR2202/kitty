@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module KittyTypes (Operator (..), ArithExpr (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), BoolExpr (..), add, sub, divide, mult, toOutput, opSymb) where
+module KittyTypes (Operator (..), ArithExpr (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), BoolExpr (..), add, sub, divide, mult, toOutput, opSymb, CompOp (..)) where
 
 import qualified Data.Map as M
 
@@ -25,6 +25,8 @@ data ArithExpr = IntLit Int | FloatLit Float | Variable String | Call FunctionCa
 
 data BoolExpr = BoolLit Bool | And BoolExpr BoolExpr | Or BoolExpr BoolExpr | Not BoolExpr | Var String | Xor BoolExpr BoolExpr | FCall FunctionCall deriving (Show)
 
+data CompOp = Equal KittyAST KittyAST | Greater KittyAST KittyAST | Less KittyAST KittyAST | NotEqual KittyAST KittyAST | LessEq KittyAST KittyAST | GreaterEq KittyAST KittyAST deriving (Show)
+
 data Definition
   = AssignDef String KittyAST
   | FunctionDef FunctionDefinition
@@ -36,6 +38,7 @@ data KittyAST
   = None
   | Expr ArithExpr
   | Boolean BoolExpr
+  | Comp CompOp
   | StrLit String
   | DefType Definition
   deriving (Show)
@@ -115,6 +118,15 @@ instance ProgramOutput KittyAST where
   toOutput (Boolean e) = toOutput e
   toOutput (StrLit s) = s
   toOutput (DefType d) = show d
+  toOutput (Comp c) = toOutput c
+
+instance ProgramOutput CompOp where
+  toOutput (Equal x y) = toOutput x ++ "==" ++ toOutput y
+  toOutput (NotEqual x y) = toOutput x ++ "=/=" ++ toOutput y
+  toOutput (Less x y) = toOutput x ++ "<" ++ toOutput y
+  toOutput (Greater x y) = toOutput x ++ ">" ++ toOutput y
+  toOutput (GreaterEq x y) = toOutput x ++ ">=" ++ toOutput y
+  toOutput (LessEq x y) = toOutput x ++ "<=" ++ toOutput y
 
 instance ProgramOutput ArithExpr where
   toOutput (IntLit x) = show x

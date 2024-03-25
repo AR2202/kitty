@@ -139,6 +139,45 @@ boolopvarParser = chainl1 (try notParser <|> try falseParser <|> try trueParser 
 boolvarParser :: Parser BoolExpr
 boolvarParser = Var <$> (spaces *> many1 alphaNum <* spaces)
 
+
+{- Parsing comparisons -}
+
+
+
+eqop :: Parser  CompOp
+eqop =
+  Equal<$>(astSubParser
+    <* string
+      "==")<*> astSubParser
+notEqop :: Parser  CompOp
+notEqop =
+  NotEqual<$>(astSubParser
+    <* string
+      "=/=")<*> astSubParser
+lessEqop :: Parser  CompOp
+lessEqop =
+  LessEq<$>(astSubParser
+    <* string
+      "<=")<*> astSubParser
+lessop :: Parser  CompOp
+lessop =
+  Less<$>(astSubParser
+    <* string
+      "<")<*> astSubParser
+greaterEqop :: Parser  CompOp
+greaterEqop =
+  GreaterEq<$>(astSubParser
+    <* string
+      ">=")<*> astSubParser
+greaterop :: Parser  CompOp
+greaterop =
+  Greater<$>(astSubParser
+    <* string
+      ">")<*> astSubParser
+
+compParser :: Parser CompOp
+compParser = try greaterop <|> try lessop <|> try greaterEqop<|> try lessEqop <|> try eqop<|> notEqop
+
 {-Parsing assignments-}
 
 -- | assigning variables
@@ -155,14 +194,20 @@ astBoolParser = Boolean <$> boolParser
 -- | parses assignment as DefType variant of AST
 astBoolVarParser :: Parser KittyAST
 astBoolVarParser = Boolean <$> boolopvarParser
+
+astCompParser :: Parser KittyAST 
+astCompParser = Comp <$> compParser
 -- | parse variables
 varParser :: Parser ArithExpr
 varParser = Variable <$> (spaces *> many1 alphaNum <* spaces)
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try astAssignParser <|> try astBoolParser <|> try astArithParser <|> astBoolVarParser
+astParser = try astAssignParser <|> try astCompParser<|> try astBoolParser <|> try astArithParser <|>  astBoolVarParser 
 
+-- | parses  AST subexpression for use within CompOp
+astSubParser :: Parser KittyAST
+astSubParser =  try astBoolParser <|> try astArithParser <|> astBoolVarParser
 {- helper function to test parsing in the console-}
 
 -- | parsing an int from console input - no file

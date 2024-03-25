@@ -15,7 +15,8 @@ repl = do
   putStrLn "Wecome to Kitty!"
   putStrLn " /\\_/\\"
   putStrLn "( o.o )"
-  putStrLn " > v <"
+  putStrLn " > ^ <"
+
   putStrLn "please enter quit to quit"
   putStrLn "or help for more info"
   putStrLn "or simply enter your kitty code >:X)"
