@@ -16,6 +16,10 @@ eval env (Expr e) = case evalExpression env e of
 -- considering disallowing re-assigning to make immutable,
 -- but currently mutability is allowed
 eval env (DefType (AssignDef varname vardef)) = Right $ env {_variables = M.insert varname vardef (_variables env)}
+eval env (Boolean e) = case evalBoolean env e of 
+  Left err -> Left err
+  Right exp -> Right $ env {_tmpResult = Boolean exp}
+
 
 evalExpression :: Env -> ArithExpr -> Either KittyError ArithExpr
 evalExpression _ (IntLit i) = Right $ IntLit i
@@ -32,6 +36,21 @@ evalExpression env (Exp op e1 e2) = case evalExpression env e1 of
 evalExpression env (Parens e) = evalExpression env e
 evalExpression env (Variable v) = evalVariable v env >>= eval2ArithExpr
 
+evalBoolean env (BoolLit tf) = Right $ BoolLit tf 
+evalBoolean env (And b1 b2) 
+  |evalBoolean env b1 == Right (BoolLit True) && evalBoolean env b2 == Right(BoolLit True) = Right $ BoolLit True 
+  | otherwise = Right $BoolLit False
+evalBoolean env (Or b1 b2) 
+  |evalBoolean env b1 == Right (BoolLit True) || evalBoolean env b2 == Right (BoolLit True) = Right $BoolLit True 
+  | otherwise = Right $BoolLit False
+evalBoolean env (Xor b1 b2)
+--could be replaced by evalBoolean env b1 /= evalBoolean env b2
+-- if we can be certain that it can't eval to anything other than BoolLit True or BoolLit False
+  |evalBoolean env b1 == Right(BoolLit True) || evalBoolean env b2 == Right (BoolLit False) = Right $BoolLit True
+  |evalBoolean env b1 == Right (BoolLit False) || evalBoolean env b2 == Right (BoolLit False) = Right $BoolLit True 
+  |otherwise = Right $BoolLit False
+evalBoolean env (Var v) = evalVariable v env >>= eval2BoolExpr
+
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of
   Nothing -> Left $ DoesNotExistError $ "the variable " ++ v ++ " does not exist"
@@ -40,7 +59,9 @@ evalVariable v env = case M.lookup v (_variables env) of
 eval2ArithExpr :: KittyAST -> Either KittyError ArithExpr
 eval2ArithExpr (Expr a) = Right a
 eval2ArithExpr x = Left $ TypeError $ toOutput x ++ "can't be interpreted as an arithmetic expression"
-
+eval2BoolExpr :: KittyAST -> Either KittyError BoolExpr
+eval2BoolExpr (Boolean a) = Right a
+eval2BoolExpr x = Left $ TypeError $ toOutput x ++ "can't be interpreted as a truth value"
 evalAndPrintEnv :: Env -> KittyAST -> String
 evalAndPrintEnv e a = show (eval e a)
 

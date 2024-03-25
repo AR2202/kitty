@@ -2,6 +2,7 @@
 
 module KittyTypes (Operator (..), ArithExpr (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), BoolExpr (..), add, sub, divide, mult, toOutput, opSymb, CompOp (..)) where
 
+import Data.Char (toLower)
 import qualified Data.Map as M
 
 data KType = KBool | KInt | KFloat | KString | KVoid deriving (Read, Eq)
@@ -21,9 +22,9 @@ data Operator
   deriving (Show, Read, Eq)
 
 -- not sure this duplication of variable and function call is sensible
-data ArithExpr = IntLit Int | FloatLit Float | Variable String | Call FunctionCall | Exp Operator ArithExpr ArithExpr | Parens ArithExpr deriving (Show)
+data ArithExpr = IntLit Int | FloatLit Float | Variable String | Call FunctionCall | Exp Operator ArithExpr ArithExpr | Parens ArithExpr deriving (Show, Eq)
 
-data BoolExpr = BoolLit Bool | And BoolExpr BoolExpr | Or BoolExpr BoolExpr | Not BoolExpr | Var String | Xor BoolExpr BoolExpr | FCall FunctionCall deriving (Show)
+data BoolExpr = BoolLit Bool | And BoolExpr BoolExpr | Or BoolExpr BoolExpr | Not BoolExpr | Var String | Xor BoolExpr BoolExpr | FCall FunctionCall deriving (Show, Eq)
 
 data CompOp = Equal KittyAST KittyAST | Greater KittyAST KittyAST | Less KittyAST KittyAST | NotEqual KittyAST KittyAST | LessEq KittyAST KittyAST | GreaterEq KittyAST KittyAST deriving (Show)
 
@@ -32,7 +33,7 @@ data Definition
   | FunctionDef FunctionDefinition
   deriving (Show)
 
-data FunctionCall = FunctionCall String [String] deriving (Show)
+data FunctionCall = FunctionCall String [String] deriving (Show, Eq)
 
 data KittyAST
   = None
@@ -137,7 +138,7 @@ instance ProgramOutput ArithExpr where
   toOutput (Variable v) = v
 
 instance ProgramOutput BoolExpr where
-  toOutput (BoolLit x) = show x
+  toOutput (BoolLit x) = map toLower $ show x
   toOutput (And e1 e2) = toOutput e1 ++ " and " ++ toOutput e2
   toOutput (Or e1 e2) = toOutput e1 ++ " or " ++ toOutput e2
   toOutput (Xor e1 e2) = toOutput e1 ++ " xor " ++ toOutput e2

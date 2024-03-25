@@ -3,6 +3,7 @@
 module REPL (repl) where
 
 import Control.Exception (catchJust)
+import Data.List (isPrefixOf)
 import qualified Data.Text as T
 import Evaluator
 import KittyTypes
@@ -32,15 +33,18 @@ repl' env = do
       help <- readFileIfExists "resources/help.txt"
       putStrLn help >> repl' env
     -- with pattern matching, can only use single letter, needs to be parsed properly
-    't' : s -> putStrLn (typeCheckOutput env (T.pack s)) >> repl' env
+
     -- type checking first, but printing result of type checking
     -- only if type error
-      -- otherwise, continue with evaluation
-    _ -> case typeCheck env (T.pack input) of
-      Left err -> print err >> repl' env
-      Right _ -> case parseRepl env (T.pack input) of
-        Left err -> print err >> repl' env
-        Right newenv -> putStrLn ((toOutput . _tmpResult) newenv) >> repl' newenv
+    -- otherwise, continue with evaluation
+    _ ->
+      if "type " `isPrefixOf` input
+        then putStrLn (typeCheckOutput env (T.pack (drop 5 input))) >> repl' env
+        else case typeCheck env (T.pack input) of
+          Left err -> print err >> repl' env
+          Right _ -> case parseRepl env (T.pack input) of
+            Left err -> print err >> repl' env
+            Right newenv -> putStrLn ((toOutput . _tmpResult) newenv) >> repl' newenv
 
 -- | reads a file from FilePath if path exists and return conent, otherwise returns an error message string
 readFileIfExists :: FilePath -> IO String
