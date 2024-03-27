@@ -46,6 +46,6 @@ repl' env = do
             Left err -> print err >> repl' env
             Right newenv -> putStrLn ((toOutput . _tmpResult) newenv) >> repl' newenv
 
--- | reads a file from FilePath if path exists and return conent, otherwise returns an error message string
+-- | reads a file from FilePath if path exists and returns conent, otherwise returns an error message string
 readFileIfExists :: FilePath -> IO String
 readFileIfExists file = catchJust (\e -> if isDoesNotExistErrorType (ioeGetErrorType e) then Just () else Nothing) (readFile file) (\_ -> return (file ++ " not found"))
