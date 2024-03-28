@@ -24,7 +24,7 @@ data Operator
 data Definition
   = AssignDef String KittyAST
   | FunctionDef FunctionDefinition
-  deriving (Show)
+  deriving (Show,Eq)
 
 data FunctionCall = FunctionCall String [String] deriving (Show, Eq)
 
@@ -49,14 +49,14 @@ data KittyAST
   | NotEqual KittyAST KittyAST
   | LessEq KittyAST KittyAST
   | GreaterEq KittyAST KittyAST
-  deriving (Show)
+  deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition
   { _funcName :: String,
     _funcParams :: [String],
     _funcBody :: [KittyAST]
   }
-  deriving (Show)
+  deriving (Show,Eq)
 
 type ErrorMsg = String
 

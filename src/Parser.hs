@@ -18,89 +18,88 @@ import Text.ParserCombinators.Parsec.Combinator
 {- This is the Parser for the kitty language.
 Parsing from Test directly into AST type without lexing step-}
 {-Parsing arithmetic expressions-}
-intParser :: Parser ArithExpr
+intParser :: Parser KittyAST
 intParser = IntLit . read <$> (spaces *> (many1 digit <|> ((++) <$> string "-" <*> many1 digit)) <* spaces)
 
-floatParser :: Parser ArithExpr
+floatParser :: Parser KittyAST
 floatParser = FloatLit . read <$> ((++) <$> (spaces *> (many1 digit <|> ((++) <$> string "-" <*> many1 digit))) <*> ((:) <$> char '.' <*> many1 digit) <* spaces)
 
 operatorParser :: Parser Operator
 operatorParser =
   parseWhichOperator <$> (spaces *> (oneOf "+-*/" <* spaces))
 
--- | parsing Operators into the ArithExpr type's data constructors
+-- | parsing Operators into the KittyAST type's data constructors
 parseWhichOperator :: Char -> Operator
 parseWhichOperator '+' = Add
 parseWhichOperator '-' = Sub
 parseWhichOperator '*' = Mult
 parseWhichOperator '/' = Div
 
-addop :: Parser (ArithExpr -> ArithExpr -> ArithExpr)
+addop :: Parser (KittyAST -> KittyAST -> KittyAST)
 addop =
-  Exp Add
+  Expr Add
     <$ char
       '+'
 
-subop :: Parser (ArithExpr -> ArithExpr -> ArithExpr)
+subop :: Parser (KittyAST -> KittyAST -> KittyAST)
 subop =
-  Exp Sub
+  Expr Sub
     <$ char
       '-'
 
-addsub :: Parser (ArithExpr -> ArithExpr -> ArithExpr)
+addsub :: Parser (KittyAST -> KittyAST -> KittyAST)
 addsub = addop <|> subop
 
-mulop :: Parser (ArithExpr -> ArithExpr -> ArithExpr)
+mulop :: Parser (KittyAST -> KittyAST -> KittyAST)
 mulop =
-  Exp Mult
+  Expr Mult
     <$ char
       '*'
 
-divop :: Parser (ArithExpr -> ArithExpr -> ArithExpr)
+divop :: Parser (KittyAST -> KittyAST -> KittyAST)
 divop =
-  Exp Div
+  Expr Div
     <$ char
       '/'
 
-muldiv :: Parser (ArithExpr -> ArithExpr -> ArithExpr)
+muldiv :: Parser (KittyAST -> KittyAST -> KittyAST)
 muldiv = mulop <|> divop
 
 -- | parsing multiplication or division with left association
-mulParser :: Parser ArithExpr
+mulParser :: Parser KittyAST
 mulParser = chainl1 (try parensParser <|> try floatParser <|> try intParser <|> varParser) muldiv
 
 -- | parsing addition or subtraction as left associative
-addParser :: Parser ArithExpr
+addParser :: Parser KittyAST
 addParser = chainl1 (try mulParser <|> try parensParser <|> try floatParser <|> try intParser <|> varParser) addsub
 
 -- | parsing parentheses
-parensParser :: Parser ArithExpr
+parensParser :: Parser KittyAST
 parensParser = Parens <$> between (spaces *> char '(' <* spaces) (spaces *> char ')' <* spaces) exprParser
 
 -- | parsing an Arithmetic expression
-exprParser :: Parser ArithExpr
+exprParser :: Parser KittyAST
 exprParser = try addParser <|> try mulParser <|> try parensParser <|> try floatParser <|> try intParser <|> varParser
-
+-- | I think this is now redundant
 astArithParser :: Parser KittyAST
-astArithParser = Expr <$> exprParser
+astArithParser =  exprParser
 
 {-Parsing Bool-}
 
-{-BoolLit Bool | And BoolExpr BoolExpr | Or BoolExpr BoolExpr | Not BoolExpr | Var String | Xor BoolExpr BoolExpr | FCall FunctionCall-}
 
-trueParser :: Parser BoolExpr
+trueParser :: Parser KittyAST
 trueParser = BoolLit True <$ (spaces *> string "true" >> notFollowedBy alphaNum <* spaces)
 
-falseParser :: Parser BoolExpr
+falseParser :: Parser KittyAST
 falseParser = BoolLit False <$ (spaces *> string "false" >> notFollowedBy alphaNum <* spaces)
 
-notParser :: Parser BoolExpr
+notParser :: Parser KittyAST
 notParser = Not <$> (spaces *> string "not" *> spaces *> boolParser)
 
-boolParser :: Parser BoolExpr
+boolParser :: Parser KittyAST
 boolParser = try boolopParser <|> try notParser <|> try falseParser <|> trueParser
 
-andop :: Parser (BoolExpr -> BoolExpr -> BoolExpr)
+andop :: Parser (KittyAST -> KittyAST -> KittyAST)
 andop =
   And
     <$ ( string
@@ -108,7 +107,7 @@ andop =
            >> notFollowedBy alphaNum
        )
 
-orop :: Parser (BoolExpr -> BoolExpr -> BoolExpr)
+orop :: Parser (KittyAST -> KittyAST -> KittyAST)
 orop =
   Or
     <$ ( string
@@ -116,7 +115,7 @@ orop =
            >> notFollowedBy alphaNum
        )
 
-xorop :: Parser (BoolExpr -> BoolExpr -> BoolExpr)
+xorop :: Parser (KittyAST -> KittyAST -> KittyAST)
 xorop =
   Xor
     <$ ( string
@@ -124,58 +123,58 @@ xorop =
            >> notFollowedBy alphaNum
        )
 
-boolop :: Parser (BoolExpr -> BoolExpr -> BoolExpr)
+boolop :: Parser (KittyAST -> KittyAST -> KittyAST)
 boolop = andop <|> xorop <|> orop
 
 -- | parsing boolean operations with left association
-boolopParser :: Parser BoolExpr
+boolopParser :: Parser KittyAST
 boolopParser = chainl1 (try notParser <|> try falseParser <|>  trueParser ) boolop
 
 -- | parsing boolean operations with left association
-boolopvarParser :: Parser BoolExpr
+boolopvarParser :: Parser KittyAST
 boolopvarParser = chainl1 (try notParser <|> try falseParser <|> try trueParser <|> boolvarParser) boolop
 
--- | parse variables
-boolvarParser :: Parser BoolExpr
-boolvarParser = Var <$> (spaces *> many1 alphaNum <* spaces)
+-- | parse variables I think this is redundant
+boolvarParser :: Parser KittyAST
+boolvarParser = Variable <$> (spaces *> many1 alphaNum <* spaces)
 
 
 {- Parsing comparisons -}
 
 
 
-eqop :: Parser  CompOp
+eqop :: Parser  KittyAST
 eqop =
   Equal<$>(astSubParser
     <* string
       "==")<*> astSubParser
-notEqop :: Parser  CompOp
+notEqop :: Parser  KittyAST
 notEqop =
   NotEqual<$>(astSubParser
     <* string
       "=/=")<*> astSubParser
-lessEqop :: Parser  CompOp
+lessEqop :: Parser  KittyAST
 lessEqop =
   LessEq<$>(astSubParser
     <* string
       "<=")<*> astSubParser
-lessop :: Parser  CompOp
+lessop :: Parser  KittyAST
 lessop =
   Less<$>(astSubParser
     <* string
       "<")<*> astSubParser
-greaterEqop :: Parser  CompOp
+greaterEqop :: Parser  KittyAST
 greaterEqop =
   GreaterEq<$>(astSubParser
     <* string
       ">=")<*> astSubParser
-greaterop :: Parser  CompOp
+greaterop :: Parser  KittyAST
 greaterop =
   Greater<$>(astSubParser
     <* string
       ">")<*> astSubParser
 
-compParser :: Parser CompOp
+compParser :: Parser KittyAST
 compParser = try greaterop <|> try lessop <|> try greaterEqop<|> try lessEqop <|> try eqop<|> notEqop
 
 {-Parsing assignments-}
@@ -190,31 +189,31 @@ astAssignParser = DefType <$> assignmentParser
 
 -- | parses assignment as DefType variant of AST
 astBoolParser :: Parser KittyAST
-astBoolParser = Boolean <$> boolParser
+astBoolParser =  boolParser
 -- | parses assignment as DefType variant of AST
 astBoolVarParser :: Parser KittyAST
-astBoolVarParser = Boolean <$> boolopvarParser
+astBoolVarParser =  boolopvarParser
 
 astCompParser :: Parser KittyAST 
-astCompParser = Comp <$> compParser
+astCompParser =  compParser
 -- | parse variables
-varParser :: Parser ArithExpr
+varParser :: Parser KittyAST
 varParser = Variable <$> (spaces *> many1 alphaNum <* spaces)
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
 astParser = try astAssignParser <|> try astCompParser<|> try astBoolParser <|> try astArithParser <|>  astBoolVarParser 
 
--- | parses  AST subexpression for use within CompOp
+-- | parses  AST subexpression for use within KittyAST
 astSubParser :: Parser KittyAST
 astSubParser =  try astBoolParser <|> try astArithParser <|> astBoolVarParser
 {- helper function to test parsing in the console-}
 
 -- | parsing an int from console input - no file
-parseAsInt :: T.Text -> Either ParseError ArithExpr
+parseAsInt :: T.Text -> Either ParseError KittyAST
 parseAsInt = parse intParser "no file"
 
-parseAsFloat :: T.Text -> Either ParseError ArithExpr
+parseAsFloat :: T.Text -> Either ParseError KittyAST
 parseAsFloat = parse floatParser "no file"
 
 -- | parsing an Operator from console input - no file
@@ -222,7 +221,7 @@ parseAsOperator :: T.Text -> Either ParseError Operator
 parseAsOperator = parse operatorParser "no file"
 
 -- | parsing an Expression from console input - no file
-parseAsExp :: T.Text -> Either ParseError ArithExpr
+parseAsExp :: T.Text -> Either ParseError KittyAST
 parseAsExp = parse exprParser "no file"
 
 -- | parsing an ast input - no file
@@ -230,5 +229,5 @@ parseAsAST :: T.Text -> Either ParseError KittyAST
 parseAsAST = parse astParser "no file"
 
 -- | parsing a Boolean Expression from console input - no file
-parseAsBool :: T.Text -> Either ParseError BoolExpr
+parseAsBool :: T.Text -> Either ParseError KittyAST
 parseAsBool = parse boolParser "no file"
