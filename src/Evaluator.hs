@@ -32,6 +32,45 @@ eval env (Xor b1 b2) = case evalBoolean env (Xor b1 b2) of
 eval env (Not b) = case evalBoolean env (Not b) of
   Left err -> Left err
   Right exp -> Right $ env {_tmpResult = exp}
+eval env (Equal e1 e2) = case evalComp env (Equal e1 e2) of
+  Left err -> Left err
+  Right exp -> Right $ env {_tmpResult = exp}
+eval env (NotEqual e1 e2) = case evalComp env (NotEqual e1 e2) of
+  Left err -> Left err
+  Right exp -> Right $ env {_tmpResult = exp}
+eval env (Less e1 e2) = case evalComp env (Less e1 e2) of
+  Left err -> Left err
+  Right exp -> Right $ env {_tmpResult = exp}
+eval env (Greater e1 e2) = case evalComp env (Greater e1 e2) of
+  Left err -> Left err
+  Right exp -> Right $ env {_tmpResult = exp}
+eval env (LessEq e1 e2) = case evalComp env (LessEq e1 e2) of
+  Left err -> Left err
+  Right exp -> Right $ env {_tmpResult = exp}
+eval env (GreaterEq e1 e2) = case evalComp env (GreaterEq e1 e2) of
+  Left err -> Left err
+  Right exp -> Right $ env {_tmpResult = exp}
+
+evalComp env (GreaterEq (IntLit i) (IntLit j)) = Right $ BoolLit (i >= j)
+evalComp env (GreaterEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i >= j)
+evalComp env (GreaterEq e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalComp env (GreaterEq e x)
+evalComp env (LessEq (IntLit i) (IntLit j)) = Right $ BoolLit (i <= j)
+evalComp env (LessEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i <= j)
+evalComp env (LessEq e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalComp env (LessEq e x)
+evalComp env (Greater (IntLit i) (IntLit j)) = Right $ BoolLit (i > j)
+evalComp env (Greater (FloatLit i) (FloatLit j)) = Right $ BoolLit (i > j)
+evalComp env (Greater e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalComp env (Greater e x)
+evalComp env (Less (IntLit i) (IntLit j)) = Right $ BoolLit (i < j)
+evalComp env (Less (FloatLit i) (FloatLit j)) = Right $ BoolLit (i < j)
+evalComp env (Less e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalComp env (Less e x)
 
 evalBoolean env (BoolLit tf) = Right $ BoolLit tf
 evalBoolean env (And b1 b2)
