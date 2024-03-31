@@ -10,89 +10,10 @@ initialEnv :: Env
 initialEnv = Env M.empty M.empty None
 
 eval :: Env -> KittyAST -> Either KittyError Env
-eval env (Expr op e1 e2) = case evalExpression env (Expr op e1 e2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
--- considering disallowing re-assigning to make immutable,
--- but currently mutability is allowed
 eval env (DefType (AssignDef varname vardef)) = Right $ env {_variables = M.insert varname vardef (_variables env)}
-eval env (BoolLit tf) = Right $ env {_tmpResult = BoolLit tf}
-eval env (IntLit i) = Right $ env {_tmpResult = IntLit i}
-eval env (FloatLit f) = Right $ env {_tmpResult = FloatLit f}
-eval env (StrLit s) = Right $ env {_tmpResult = StrLit s}
-eval env (And b1 b2) = case evalBoolean env (And b1 b2) of
+eval env e = case evalExpression env e of
   Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (Or b1 b2) = case evalBoolean env (Or b1 b2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (Xor b1 b2) = case evalBoolean env (Xor b1 b2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (Not b) = case evalBoolean env (Not b) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (Equal e1 e2) = case evalComp env (Equal e1 e2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (NotEqual e1 e2) = case evalComp env (NotEqual e1 e2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (Less e1 e2) = case evalComp env (Less e1 e2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (Greater e1 e2) = case evalComp env (Greater e1 e2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (LessEq e1 e2) = case evalComp env (LessEq e1 e2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-eval env (GreaterEq e1 e2) = case evalComp env (GreaterEq e1 e2) of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult = exp}
-
-evalComp env (GreaterEq (IntLit i) (IntLit j)) = Right $ BoolLit (i >= j)
-evalComp env (GreaterEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i >= j)
-evalComp env (GreaterEq e1 e2) = case evalExpression env e1 of
-  Left err -> Left err
-  Right e -> evalExpression env e2 >>= \x -> evalComp env (GreaterEq e x)
-evalComp env (LessEq (IntLit i) (IntLit j)) = Right $ BoolLit (i <= j)
-evalComp env (LessEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i <= j)
-evalComp env (LessEq e1 e2) = case evalExpression env e1 of
-  Left err -> Left err
-  Right e -> evalExpression env e2 >>= \x -> evalComp env (LessEq e x)
-evalComp env (Greater (IntLit i) (IntLit j)) = Right $ BoolLit (i > j)
-evalComp env (Greater (FloatLit i) (FloatLit j)) = Right $ BoolLit (i > j)
-evalComp env (Greater e1 e2) = case evalExpression env e1 of
-  Left err -> Left err
-  Right e -> evalExpression env e2 >>= \x -> evalComp env (Greater e x)
-evalComp env (Less (IntLit i) (IntLit j)) = Right $ BoolLit (i < j)
-evalComp env (Less (FloatLit i) (FloatLit j)) = Right $ BoolLit (i < j)
-evalComp env (Less e1 e2) = case evalExpression env e1 of
-  Left err -> Left err
-  Right e -> evalExpression env e2 >>= \x -> evalComp env (Less e x)
-
-evalBoolean env (BoolLit tf) = Right $ BoolLit tf
-evalBoolean env (And b1 b2)
-  | evalBoolean env b1 == Right (BoolLit True) && evalBoolean env b2 == Right (BoolLit True) = Right $ BoolLit True
-  | otherwise = Right $ BoolLit False
-evalBoolean env (Or b1 b2)
-  | evalBoolean env b1 == Right (BoolLit True) || evalBoolean env b2 == Right (BoolLit True) = Right $ BoolLit True
-  | otherwise = Right $ BoolLit False
-evalBoolean env (Xor b1 b2)
-  -- could be replaced by evalBoolean env b1 /= evalBoolean env b2
-  -- if we can be certain that it can't eval to anything other than BoolLit True or BoolLit False
-  | evalBoolean env b1 == Right (BoolLit True) || evalBoolean env b2 == Right (BoolLit False) = Right $ BoolLit True
-  | evalBoolean env b1 == Right (BoolLit False) || evalBoolean env b2 == Right (BoolLit False) = Right $ BoolLit True
-  | otherwise = Right $ BoolLit False
-evalBoolean env (Variable v) = evalVariable v env >>= evalBoolean env
-evalBoolean env (Not (BoolLit True)) = Right $ BoolLit False
-evalBoolean env (Not (BoolLit False)) = Right $ BoolLit True
-evalBoolean env (Not b) = evalBoolean env b >>= \x -> evalBoolean env (Not x)
-
-{- eval env (Boolean e) = case evalBoolean env e of
-  Left err -> Left err
-  Right exp -> Right $ env {_tmpResult =  exp} -}
+  Right res -> Right $ env {_tmpResult = res}
 
 evalExpression :: Env -> KittyAST -> Either KittyError KittyAST
 evalExpression _ (IntLit i) = Right $ IntLit i
@@ -108,6 +29,55 @@ evalExpression env (Expr op e1 e2) = case evalExpression env e1 of
     Right exp2 -> evalExpression env (Expr op exp1 exp2)
 evalExpression env (Parens e) = evalExpression env e
 evalExpression env (Variable v) = evalVariable v env >>= evalExpression env
+evalExpression env (BoolLit tf) = Right $ BoolLit tf
+evalExpression env (And b1 b2)
+  | evalExpression env b1 == Right (BoolLit True) && evalExpression env b2 == Right (BoolLit True) = Right $ BoolLit True
+  | otherwise = Right $ BoolLit False
+evalExpression env (Or b1 b2)
+  | evalExpression env b1 == Right (BoolLit True) || evalExpression env b2 == Right (BoolLit True) = Right $ BoolLit True
+  | otherwise = Right $ BoolLit False
+evalExpression env (Xor b1 b2)
+  | evalExpression env b1 == Right (BoolLit True) || evalExpression env b2 == Right (BoolLit False) = Right $ BoolLit True
+  | evalExpression env b1 == Right (BoolLit False) || evalExpression env b2 == Right (BoolLit False) = Right $ BoolLit True
+  | otherwise = Right $ BoolLit False
+evalExpression env (Variable v) = evalVariable v env >>= evalExpression env
+evalExpression env (Not (BoolLit True)) = Right $ BoolLit False
+evalExpression env (Not (BoolLit False)) = Right $ BoolLit True
+evalExpression env (Not b) = evalExpression env b >>= \x -> evalExpression env (Not x)
+evalExpression env (GreaterEq (IntLit i) (IntLit j)) = Right $ BoolLit (i >= j)
+evalExpression env (GreaterEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i >= j)
+evalExpression env (GreaterEq e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalExpression env (GreaterEq e x)
+evalExpression env (LessEq (IntLit i) (IntLit j)) = Right $ BoolLit (i <= j)
+evalExpression env (LessEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i <= j)
+evalExpression env (LessEq e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalExpression env (LessEq e x)
+evalExpression env (Greater (IntLit i) (IntLit j)) = Right $ BoolLit (i > j)
+evalExpression env (Greater (FloatLit i) (FloatLit j)) = Right $ BoolLit (i > j)
+evalExpression env (Greater e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalExpression env (Greater e x)
+evalExpression env (Less (IntLit i) (IntLit j)) = Right $ BoolLit (i < j)
+evalExpression env (Less (FloatLit i) (FloatLit j)) = Right $ BoolLit (i < j)
+evalExpression env (Less e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalExpression env (Less e x)
+evalExpression env (Equal (IntLit i) (IntLit j)) = Right $ BoolLit (i == j)
+evalExpression env (Equal (FloatLit i) (FloatLit j)) = Right $ BoolLit (i == j)
+evalExpression env (Equal (BoolLit i) (BoolLit j)) = Right $ BoolLit (i == j)
+evalExpression env (Equal (StrLit i) (StrLit j)) = Right $ BoolLit (i == j)
+evalExpression env (Equal e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalExpression env (Equal e x)
+evalExpression env (NotEqual (IntLit i) (IntLit j)) = Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (FloatLit i) (FloatLit j)) = Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (BoolLit i) (BoolLit j)) = Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (StrLit i) (StrLit j)) = Right $ BoolLit (i /= j)
+evalExpression env (NotEqual e1 e2) = case evalExpression env e1 of
+  Left err -> Left err
+  Right e -> evalExpression env e2 >>= \x -> evalExpression env (NotEqual e x)
 
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of

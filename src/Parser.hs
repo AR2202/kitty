@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (intParser, parseAsInt, parseAsFloat, parseAsOperator,  parseAsAST) where
+module Parser (intParser, parseAsInt, parseAsFloat, parseAsOperator, parseAsAST) where
 
 -- import qualified Data.Text as T
 
@@ -77,12 +77,6 @@ addParser = chainl1 (try mulParser <|> try parensParser <|> try boolopParser <|>
 parensParser :: Parser KittyAST
 parensParser = Parens <$> between (spaces *> char '(' <* spaces) (spaces *> char ')' <* spaces) astParser
 
-{- -- | parsing an Arithmetic expression
-exprParser :: Parser KittyAST
-exprParser = try addParser <|> try mulParser <|> try parensParser <|> try floatParser <|> try intParser <|> varParser -}
-
-
-
 {-Parsing Bool-}
 
 trueParser :: Parser KittyAST
@@ -93,9 +87,6 @@ falseParser = BoolLit False <$ (spaces *> string "false" >> notFollowedBy alphaN
 
 notParser :: Parser KittyAST
 notParser = Not <$> (spaces *> string "not" *> spaces *> astSubParser)
-
-{- boolParser :: Parser KittyAST
-boolParser = try boolopParser <|> try notParser <|> try mulParser <|> try addParser <|> try falseParser <|> trueParser -}
 
 andop :: Parser (KittyAST -> KittyAST -> KittyAST)
 andop =
@@ -126,16 +117,9 @@ boolop = andop <|> xorop <|> orop
 
 -- | parsing boolean operations with left association
 boolopParser :: Parser KittyAST
-boolopParser = chainl1 (try parensParser <|>try notParser   <|> try falseParser <|> try trueParser<|> try floatParser <|> try intParser <|> varParser) boolop
+boolopParser = chainl1 (try parensParser <|> try notParser <|> try falseParser <|> try trueParser <|> try floatParser <|> try intParser <|> varParser) boolop
 
 -- | parsing boolean operations with left association
-
-{- boolopvarParser :: Parser KittyAST
-boolopvarParser = chainl1 (try notParser <|> try falseParser <|> try trueParser <|> boolvarParser) boolop
-
--- | parse variables I think this is redundant
-boolvarParser :: Parser KittyAST
-boolvarParser = Variable <$> (spaces *> many1 alphaNum <* spaces) -}
 
 {- Parsing comparisons -}
 
@@ -200,18 +184,27 @@ compParser = try greaterop <|> try lessop <|> try greaterEqop <|> try lessEqop <
 
 -- | assigning variables
 assignmentParser :: Parser Definition
-assignmentParser = AssignDef <$> (spaces *> many1 alphaNum <* spaces) <* (char '=' >> noneOf "=<>") <*> (spaces *> (try boolopParser 
- <|> 
- try addParser <|> try mulParser 
- <|> try compParser 
-  <|> 
- try trueParser <|> try falseParser <|> try floatParser <|> try intParser <|> varParser) <* spaces)
+assignmentParser =
+  AssignDef
+    <$> (spaces *> many1 alphaNum <* spaces)
+    <* (char '=' >> noneOf "=<>")
+    <*> ( spaces
+            *> ( try boolopParser
+                   <|> try addParser
+                   <|> try mulParser
+                   <|> try compParser
+                   <|> try trueParser
+                   <|> try falseParser
+                   <|> try floatParser
+                   <|> try intParser
+                   <|> varParser
+               )
+            <* spaces
+        )
 
 -- | parses assignment as DefType variant of AST
 astAssignParser :: Parser KittyAST
 astAssignParser = DefType <$> assignmentParser
-
-
 
 -- | parse variables
 varParser :: Parser KittyAST
@@ -219,14 +212,16 @@ varParser = Variable <$> (spaces *> many1 alphaNum <* spaces)
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try astAssignParser <|> try compParser  <|> try addParser <|> try mulParser <|> try boolopParser<|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+astParser = try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try boolopParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser :: Parser KittyAST
-astSubParser =  try boolopParser <|> try addParser <|> try mulParser <|> try parensParser <|> try compParser <|>try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+astSubParser = try boolopParser <|> try addParser <|> try mulParser <|> try parensParser <|> try compParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+
 -- | parses  AST subexpression for use within KittyAST
 astSubParser' :: Parser KittyAST
-astSubParser' =   try addParser <|> try mulParser <|> try parensParser <|> try boolopParser <|>try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+astSubParser' = try addParser <|> try mulParser <|> try parensParser <|> try boolopParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+
 {- helper function to test parsing in the console-}
 
 -- | parsing an int from console input - no file
