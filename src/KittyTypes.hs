@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module KittyTypes (Operator (..), ArithExpr (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), BoolExpr (..), add, sub, divide, mult, toOutput, opSymb, CompOp (..)) where
+module KittyTypes (Operator (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb, ) where
 
 import Data.Char (toLower)
 import qualified Data.Map as M
@@ -21,35 +21,42 @@ data Operator
   | Sub
   deriving (Show, Read, Eq)
 
--- not sure this duplication of variable and function call is sensible
-data ArithExpr = IntLit Int | FloatLit Float | Variable String | Call FunctionCall | Exp Operator ArithExpr ArithExpr | Parens ArithExpr deriving (Show, Eq)
-
-data BoolExpr = BoolLit Bool | And BoolExpr BoolExpr | Or BoolExpr BoolExpr | Not BoolExpr | Var String | Xor BoolExpr BoolExpr | FCall FunctionCall deriving (Show, Eq)
-
-data CompOp = Equal KittyAST KittyAST | Greater KittyAST KittyAST | Less KittyAST KittyAST | NotEqual KittyAST KittyAST | LessEq KittyAST KittyAST | GreaterEq KittyAST KittyAST deriving (Show)
-
 data Definition
   = AssignDef String KittyAST
   | FunctionDef FunctionDefinition
-  deriving (Show)
+  deriving (Show,Eq)
 
 data FunctionCall = FunctionCall String [String] deriving (Show, Eq)
 
 data KittyAST
   = None
-  | Expr ArithExpr
-  | Boolean BoolExpr
-  | Comp CompOp
+  | IntLit Int
+  | FloatLit Float
+  | Variable String
+  | BoolLit Bool
   | StrLit String
   | DefType Definition
-  deriving (Show)
+  | Call FunctionCall
+  | Expr Operator KittyAST KittyAST
+  | Parens KittyAST
+  | And KittyAST KittyAST
+  | Or KittyAST KittyAST
+  | Not KittyAST
+  | Xor KittyAST KittyAST
+  | Equal KittyAST KittyAST
+  | Greater KittyAST KittyAST
+  | Less KittyAST KittyAST
+  | NotEqual KittyAST KittyAST
+  | LessEq KittyAST KittyAST
+  | GreaterEq KittyAST KittyAST
+  deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition
   { _funcName :: String,
     _funcParams :: [String],
     _funcBody :: [KittyAST]
   }
-  deriving (Show)
+  deriving (Show,Eq)
 
 type ErrorMsg = String
 
@@ -92,68 +99,33 @@ instance ArithOperations Int where
   mult = (*)
   divide = div
 
-{- class TryArithOperations a where
-  tryAdd :: a -> a -> Either KittyError a
-  trySub :: a -> a -> Either KittyError a
-  tryMult :: a -> a -> Either KittyError a
-  tryDivide :: a -> a -> Either KittyError a
-
-instance TryArithOperations KittyAST where
-  tryAdd None x = Right x
-  tryAdd x None = Right x
-  tryAdd (NumI i) (NumI j) = Right $ NumI (add i j)
-  tryAdd (NumF i) (NumF j) = Right $ NumF (add i j)
-  tryAdd (StrLit s) (StrLit t) = Right $ StrLit (s ++ t)
-  tryAdd (Variable s) _ = Left (UndefinedError "variable " ++ s) -- variables have to be resolved first
-  tryAdd _ (Variable s) = Left (UndefinedError "variable " ++ s)
-  tryAdd (Arith s) _ = Left (UndefinedError "Expressions can't be added") -- expressions have to be evaluated
-  tryAdd _ (Arith s) = Left (UndefinedError "Expressions can't be added")
-  tryAdd x y = Left $ TypeError "Types " ++ typeOf x ++ " and " ++ typeOf y " can't be added" -}
-
 class ProgramOutput a where
   toOutput :: a -> String
 
 instance ProgramOutput KittyAST where
   toOutput None = ""
-  toOutput (Expr e) = toOutput e
-  toOutput (Boolean e) = toOutput e
   toOutput (StrLit s) = s
   toOutput (DefType d) = show d
-  toOutput (Comp c) = toOutput c
-
-instance ProgramOutput CompOp where
   toOutput (Equal x y) = toOutput x ++ "==" ++ toOutput y
   toOutput (NotEqual x y) = toOutput x ++ "=/=" ++ toOutput y
   toOutput (Less x y) = toOutput x ++ "<" ++ toOutput y
   toOutput (Greater x y) = toOutput x ++ ">" ++ toOutput y
   toOutput (GreaterEq x y) = toOutput x ++ ">=" ++ toOutput y
   toOutput (LessEq x y) = toOutput x ++ "<=" ++ toOutput y
-
-instance ProgramOutput ArithExpr where
   toOutput (IntLit x) = show x
   toOutput (FloatLit x) = show x
-  toOutput (Exp op e1 e2) = toOutput e1 ++ (opSymb op : toOutput e2)
+  toOutput (Expr op e1 e2) = toOutput e1 ++ (opSymb op : toOutput e2)
   toOutput (Parens e) = '(' : toOutput e ++ ")"
   toOutput (Call x) = show x
   toOutput (Variable v) = v
-
-instance ProgramOutput BoolExpr where
   toOutput (BoolLit x) = map toLower $ show x
   toOutput (And e1 e2) = toOutput e1 ++ " and " ++ toOutput e2
   toOutput (Or e1 e2) = toOutput e1 ++ " or " ++ toOutput e2
   toOutput (Xor e1 e2) = toOutput e1 ++ " xor " ++ toOutput e2
   toOutput (Not e) = "not " ++ toOutput e
-  toOutput (Var e) = e
-  toOutput (FCall e) = show e
 
 opSymb :: Operator -> Char
 opSymb Add = '+'
 opSymb Mult = '*'
 opSymb Sub = '-'
 opSymb Div = '/'
-
-{- typeOf :: KittyAST -> String
-typeOf None = "none"
-typeOf (NumI _) = "integer"
-typeOf (NumF _) = "number"
-typeOf (StrLit _) = "text" -}
