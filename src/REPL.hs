@@ -32,14 +32,18 @@ repl' env = do
     "help" -> do
       help <- readFileIfExists "resources/help.txt"
       putStrLn help >> repl' env
-    -- with pattern matching, can only use single letter, needs to be parsed properly
 
-    -- type checking first, but printing result of type checking
-    -- only if type error
-    -- otherwise, continue with evaluation
+
+
     _ ->
+      -- if input starts with the type keyword,
+      -- only type-checks the expression and prints
+      -- it's type, but doesn't evaluate it
       if "type " `isPrefixOf` input
         then putStrLn (typeCheckOutput env (T.pack (drop 5 input))) >> repl' env
+        -- type checking first, but printing result of type checking
+        -- only if type error
+        -- otherwise, continue with evaluation
         else case typeCheck env (T.pack input) of
           Left err -> print err >> repl' env
           Right _ -> case parseRepl env (T.pack input) of

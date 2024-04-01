@@ -11,12 +11,14 @@ import KittyTypes
 import KittyTypes (KittyAST, KittyError)
 import Parser
 
+{-This is the type checker of the kitty language-}
 class TypeCheckable t where
   typeOf :: t -> Env -> Either KittyError KType
 
 instance TypeCheckable KittyAST where
   typeOf None _ = Right KVoid
   typeOf (StrLit s) _ = Right KString
+  typeOf (Letter s) _ = Right KChar
   typeOf (DefType d) env = typeOf d env
   typeOf (IntLit i) _ = Right KInt
   typeOf (FloatLit f) _ = Right KFloat
@@ -27,7 +29,7 @@ instance TypeCheckable KittyAST where
         Just val -> Right val
   typeOf (Call fc) env = typeOf fc env
   typeOf (Expr o e e2) env
-    | typeOf e env == typeOf e2 env && typeOf e env /= Right KInt && typeOf e env /= Right KFloat && typeOf e env /= Right KString = Left $ TypeError ("wrong type: expected number; value of type " ++ showUnwrapped (typeOf e env) ++ " can't be combined used with Operator " ++ (show . opSymb) o)
+    | typeOf e env == typeOf e2 env && typeOf e env /= Right KInt && typeOf e env /= Right KFloat = Left $ TypeError ("wrong type: expected number; value of type " ++ showUnwrapped (typeOf e env) ++ " can't be combined used with Operator " ++ (show . opSymb) o)
     | typeOf e env == typeOf e2 env = typeOf e env
     | otherwise = Left $ TypeError ("type mismatch: value of type " ++ showUnwrapped (typeOf e env) ++ " can't be combined with a value of type " ++ showUnwrapped (typeOf e2 env) ++ " with Operator " ++ (show . opSymb) o)
   typeOf (Parens e) env = typeOf e env

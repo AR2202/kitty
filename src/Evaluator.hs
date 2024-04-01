@@ -6,6 +6,8 @@ import KittyTypes
 import Parser
 import Text.Parsec.Error
 
+{-This is the definition of the evaluation
+a tree-walk interpreter to traverse and execute the AST-}
 initialEnv :: Env
 initialEnv = Env M.empty M.empty None
 
@@ -68,6 +70,7 @@ evalExpression env (Equal (IntLit i) (IntLit j)) = Right $ BoolLit (i == j)
 evalExpression env (Equal (FloatLit i) (FloatLit j)) = Right $ BoolLit (i == j)
 evalExpression env (Equal (BoolLit i) (BoolLit j)) = Right $ BoolLit (i == j)
 evalExpression env (Equal (StrLit i) (StrLit j)) = Right $ BoolLit (i == j)
+evalExpression env (Equal (Letter i) (Letter j)) = Right $ BoolLit (i == j)
 evalExpression env (Equal e1 e2) = case evalExpression env e1 of
   Left err -> Left err
   Right e -> evalExpression env e2 >>= \x -> evalExpression env (Equal e x)
@@ -75,9 +78,12 @@ evalExpression env (NotEqual (IntLit i) (IntLit j)) = Right $ BoolLit (i /= j)
 evalExpression env (NotEqual (FloatLit i) (FloatLit j)) = Right $ BoolLit (i /= j)
 evalExpression env (NotEqual (BoolLit i) (BoolLit j)) = Right $ BoolLit (i /= j)
 evalExpression env (NotEqual (StrLit i) (StrLit j)) = Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (Letter i) (Letter j)) = Right $ BoolLit (i /= j)
 evalExpression env (NotEqual e1 e2) = case evalExpression env e1 of
   Left err -> Left err
   Right e -> evalExpression env e2 >>= \x -> evalExpression env (NotEqual e x)
+evalExpression env (StrLit s) = Right (StrLit s)
+evalExpression env (Letter c) = Right (Letter c)
 
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of
