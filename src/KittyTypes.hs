@@ -1,14 +1,15 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module KittyTypes (Operator (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb) where
+module KittyTypes (Operator (..), KittyAST (..), Env (..), TypeEnv(..),KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb) where
 
 import Data.Char (toLower)
 import qualified Data.Map as M
+import Data.List(foldl1')
 
 {- This file defines the Types and Values of a kitty programm-}
 
 -- | Kitty Types
-data KType = KBool | KInt | KFloat | KString | KChar | KVoid deriving (Read, Eq)
+data KType = KBool | KInt | KFloat | KString | KChar | KVoid | KFun ([KType],[KType]) deriving (Read, Eq)
 
 instance Show KType where
   show KBool = "truth"
@@ -17,7 +18,7 @@ instance Show KType where
   show KString = "text"
   show KVoid = "empty"
   show KChar = "letter"
-
+  show (KFun (args, returns))= foldl1' (++ ) (map show args) ++ "->"++ foldl1' ( ++) (map show returns)
 -- | Arithmetic operators
 data Operator
   = Add
@@ -87,9 +88,10 @@ instance Show KittyError where
   show (UndefinedError msg) = "Undefined Error: " ++ msg
 
 type Defs = M.Map String KittyAST
-
+type FType = M.Map String KType -- should always be KFun
+type VType = M.Map String KType
 data Env = Env {_defnitions :: Defs, _variables :: Defs, _tmpResult :: KittyAST} deriving (Show)
-
+data TypeEnv = TypeEnv {_functionTypes :: FType, _varTypes :: VType}  deriving (Show, Read, Eq)
 class ArithOperations a where
   add :: a -> a -> a
   sub :: a -> a -> a

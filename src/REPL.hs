@@ -21,34 +21,31 @@ repl = do
   putStrLn "please enter quit to quit"
   putStrLn "or help for more info"
   putStrLn "or simply enter your kitty code >:X)"
-  repl' initialEnv
+  repl' initialEnv initialTypeEnv
 
-repl' :: Env -> IO ()
-repl' env = do
+repl' :: Env -> TypeEnv -> IO ()
+repl' env tenv = do
   putStr "kitty>:X)"
   input <- getLine
   case input of
     "quit" -> putStrLn "goodbye!"
     "help" -> do
       help <- readFileIfExists "resources/help.txt"
-      putStrLn help >> repl' env
-
-
-
+      putStrLn help >> repl' env tenv
     _ ->
       -- if input starts with the type keyword,
       -- only type-checks the expression and prints
       -- it's type, but doesn't evaluate it
       if "type " `isPrefixOf` input
-        then putStrLn (typeCheckOutput env (T.pack (drop 5 input))) >> repl' env
-        -- type checking first, but printing result of type checking
+        then putStrLn (typeCheckOutput tenv (T.pack (drop 5 input))) >> repl' env tenv
+        else -- type checking first, but printing result of type checking
         -- only if type error
         -- otherwise, continue with evaluation
-        else case typeCheck env (T.pack input) of
-          Left err -> print err >> repl' env
-          Right _ -> case parseRepl env (T.pack input) of
-            Left err -> print err >> repl' env
-            Right newenv -> putStrLn ((toOutput . _tmpResult) newenv) >> repl' newenv
+        case updateTypeEnv tenv (T.pack input) of
+          Left err -> print err >> repl' env tenv
+          Right (newtenv,t) -> case parseRepl env (T.pack input) of
+            Left err -> print err >> repl' env tenv
+            Right newenv -> putStrLn ((toOutput . _tmpResult) newenv) >> repl' newenv newtenv
 
 -- | reads a file from FilePath if path exists and returns conent, otherwise returns an error message string
 readFileIfExists :: FilePath -> IO String

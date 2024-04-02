@@ -1,4 +1,4 @@
-module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput) where
+module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv) where
 
 import Control.Exception (TypeError)
 import Data.Bits (Bits (xor))
@@ -12,8 +12,11 @@ import KittyTypes (KittyAST, KittyError)
 import Parser
 
 {-This is the type checker of the kitty language-}
+initialTypeEnv :: TypeEnv
+initialTypeEnv = TypeEnv M.empty M.empty
+
 class TypeCheckable t where
-  typeOf :: t -> Env -> Either KittyError KType
+  typeOf :: t -> TypeEnv -> Either KittyError KType
 
 instance TypeCheckable KittyAST where
   typeOf None _ = Right KVoid
@@ -22,9 +25,9 @@ instance TypeCheckable KittyAST where
   typeOf (DefType d) env = typeOf d env
   typeOf (IntLit i) _ = Right KInt
   typeOf (FloatLit f) _ = Right KFloat
-  typeOf (Variable s) env = lookupVar s env >>= (flip typeOf) env
+  typeOf (Variable s) env = lookupVar s env
     where
-      lookupVar v en = case M.lookup v (_variables en) of
+      lookupVar v en = case M.lookup v (_varTypes en) of
         Nothing -> Left $ DoesNotExistError ("no variable named " ++ s)
         Just val -> Right val
   typeOf (Call fc) env = typeOf fc env
@@ -83,7 +86,7 @@ instance TypeCheckable KittyAST where
     | otherwise = Left $ TypeError $ "type  " ++ showUnwrapped (typeOf e1 env) ++ " can't be ordered, so >= can't be used on this type"
 
 instance TypeCheckable FunctionCall where
-  typeOf (FunctionCall fnName fnParams) env = case M.lookup fnName (_defnitions env) of
+  typeOf (FunctionCall fnName fnParams) env = case M.lookup fnName (_functionTypes env) of
     Nothing -> Left $ UndefinedError ("no function named " ++ fnName)
     Just _ -> Left $ UndefinedError "not yet implemented"
 
@@ -92,19 +95,27 @@ instance TypeCheckable Definition where
   typeOf _ _ = Left $ UndefinedError "not yet implemented"
 
 -- | parsers and type checks
-typeCheck :: Env -> T.Text -> Either KittyError KType
+typeCheck :: TypeEnv -> T.Text -> Either KittyError KType
 typeCheck env text = case parseAsAST text of
   Left _ -> Left $ ParseError $ T.unpack text
   Right ast -> typeOf ast env
 
 -- | parses, typechecks, then prints result
 typeCheckPrint :: T.Text -> String
-typeCheckPrint = show . typeCheck initialEnv
+typeCheckPrint = show . typeCheck initialTypeEnv
 
-typeCheckOutput :: Env -> T.Text -> String
+typeCheckOutput :: TypeEnv -> T.Text -> String
 typeCheckOutput env text = case typeCheck env text of
   Right x -> show x
   Left x -> show x
+
+updateTypeEnv :: TypeEnv -> T.Text -> Either KittyError (TypeEnv, KType)
+updateTypeEnv tenv text = case parseAsAST text of
+  Left _ -> Left $ ParseError (T.unpack text)
+  Right (DefType (AssignDef varname e)) -> case typeCheck tenv text of
+    Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)}, t)
+    Left err -> Left err
+  Right ast -> (,) tenv <$> typeOf ast tenv
 
 {-helper functions-}
 
