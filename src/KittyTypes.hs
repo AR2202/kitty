@@ -1,11 +1,14 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module KittyTypes (Operator (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb, ) where
+module KittyTypes (Operator (..), KittyAST (..), Env (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb) where
 
 import Data.Char (toLower)
 import qualified Data.Map as M
 
-data KType = KBool | KInt | KFloat | KString | KVoid deriving (Read, Eq)
+{- This file defines the Types and Values of a kitty programm-}
+
+-- | Kitty Types
+data KType = KBool | KInt | KFloat | KString | KChar | KVoid deriving (Read, Eq)
 
 instance Show KType where
   show KBool = "truth"
@@ -13,7 +16,9 @@ instance Show KType where
   show KFloat = "decimalNumber"
   show KString = "text"
   show KVoid = "empty"
+  show KChar = "letter"
 
+-- | Arithmetic operators
 data Operator
   = Add
   | Mult
@@ -21,13 +26,15 @@ data Operator
   | Sub
   deriving (Show, Read, Eq)
 
+-- | function and variable definition and assignment
 data Definition
   = AssignDef String KittyAST
   | FunctionDef FunctionDefinition
-  deriving (Show,Eq)
+  deriving (Show, Eq)
 
 data FunctionCall = FunctionCall String [String] deriving (Show, Eq)
 
+-- | AST Variants
 data KittyAST
   = None
   | IntLit Int
@@ -35,6 +42,7 @@ data KittyAST
   | Variable String
   | BoolLit Bool
   | StrLit String
+  | Letter Char
   | DefType Definition
   | Call FunctionCall
   | Expr Operator KittyAST KittyAST
@@ -56,7 +64,7 @@ data FunctionDefinition = FunctionDefinition
     _funcParams :: [String],
     _funcBody :: [KittyAST]
   }
-  deriving (Show,Eq)
+  deriving (Show, Eq)
 
 type ErrorMsg = String
 
@@ -64,6 +72,7 @@ type FileName = String
 
 type LineNumber = Int
 
+-- | Error Types
 data KittyError
   = TypeError ErrorMsg
   | ParseError ErrorMsg
@@ -123,6 +132,7 @@ instance ProgramOutput KittyAST where
   toOutput (Or e1 e2) = toOutput e1 ++ " or " ++ toOutput e2
   toOutput (Xor e1 e2) = toOutput e1 ++ " xor " ++ toOutput e2
   toOutput (Not e) = "not " ++ toOutput e
+  toOutput (Letter c) = show c
 
 opSymb :: Operator -> Char
 opSymb Add = '+'
