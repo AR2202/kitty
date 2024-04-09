@@ -1,6 +1,7 @@
 module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv) where
 
 import Control.Exception (TypeError)
+import Control.Monad (foldM)
 import Data.Bits (Bits (xor))
 import Data.Functor.Contravariant (Comparison)
 import qualified Data.Map as M
@@ -47,7 +48,7 @@ instance TypeCheckable KittyAST where
     | typeOf e1 env == typeOf e2 env = typeOf e1 env
     | otherwise = Left $ TypeError ("type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be combined with a value of type " ++ showUnwrapped (typeOf e2 env) ++ " with or ")
   typeOf (Xor e1 e2) env
-    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool = Left $ TypeError "wrong type: expected truth; xor can only be used with values of type truth"
+    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool = Left $ TypeError ("wrong type: expected truth, but got " ++ showUnwrapped (typeOf e1 env) ++ " xor can only be used with values of type truth")
     | typeOf e1 env == typeOf e2 env = typeOf e1 env
     | otherwise = Left $ TypeError ("type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be combined with a value of type " ++ showUnwrapped (typeOf e2 env) ++ " with xor ")
   typeOf (Not b) env = case typeOf b env of
@@ -84,6 +85,27 @@ instance TypeCheckable KittyAST where
     | typeOf e1 env == Right KFloat = Right KBool
     | typeOf e1 env == Right KString = Right KBool
     | otherwise = Left $ TypeError $ "type  " ++ showUnwrapped (typeOf e1 env) ++ " can't be ordered, so >= can't be used on this type"
+  typeOf (If condition ifblock) env
+    | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for if must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
+    | null ifblock = Right KVoid
+    | otherwise = case foldM updateTypeEnv' env ifblock of
+        Left err -> Left err
+        Right env -> typeOf (last ifblock) env -- type of the last expression
+        -- still undecided if this is the desired behaviour
+  typeOf (IfElse condition ifblock elseblock) env
+    | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for if must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
+    | otherwise = case ifTypeOrErr of
+        Left err -> Left err
+        Right typeIf -> case elseTypeOrErr of
+          Left err -> Left err
+          Right typeElse -> Right $ OneOf typeIf typeElse
+    where
+      ifTypeOrErr = checkIfType ifblock
+      elseTypeOrErr = checkIfType elseblock
+      checkIfType [] = Right KVoid
+      checkIfType statements = case foldM updateTypeEnv' env statements of
+        Left err -> Left err
+        Right env' -> typeOf (last statements) env'
 
 instance TypeCheckable FunctionCall where
   typeOf (FunctionCall fnName fnParams) env = case M.lookup fnName (_functionTypes env) of
@@ -116,6 +138,14 @@ updateTypeEnv tenv text = case parseAsAST text of
     Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)}, t)
     Left err -> Left err
   Right ast -> (,) tenv <$> typeOf ast tenv
+
+updateTypeEnv' :: TypeEnv -> KittyAST -> Either KittyError TypeEnv
+updateTypeEnv' tenv (DefType (AssignDef varname e)) = case typeOf e tenv of
+  Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)})
+  Left err -> Left err
+updateTypeEnv' tenv e = case typeOf e tenv of
+  Right _ -> Right tenv
+  Left err -> Left err
 
 {-helper functions-}
 

@@ -13,6 +13,16 @@ initialEnv = Env M.empty M.empty None
 
 eval :: Env -> KittyAST -> Either KittyError Env
 eval env (DefType (AssignDef varname vardef)) = Right $ env {_variables = M.insert varname vardef (_variables env)}
+eval env (If b e) = case evalExpression env b of
+  Right (BoolLit False) -> Right env
+  Right (BoolLit True) -> evalMultiple env e
+  Left err -> Left err
+  _ -> Left $ TypeError "Condition must have type truth"
+eval env (IfElse b i e) = case evalExpression env b of
+  Right (BoolLit False) ->  evalMultiple env e
+  Right (BoolLit True) -> evalMultiple env i
+  Left err -> Left err
+  _ -> Left $ TypeError "Condition must have type truth"
 eval env e = case evalExpression env e of
   Left err -> Left err
   Right res -> Right $ env {_tmpResult = res}

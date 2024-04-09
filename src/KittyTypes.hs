@@ -9,7 +9,7 @@ import Data.List(foldl1')
 {- This file defines the Types and Values of a kitty programm-}
 
 -- | Kitty Types
-data KType = KBool | KInt | KFloat | KString | KChar | KVoid | KFun ([KType],[KType]) deriving (Read, Eq)
+data KType = KBool | KInt | KFloat | KString | KChar | KVoid | OneOf KType KType | KFun ([KType],[KType]) deriving (Read, Eq)
 
 instance Show KType where
   show KBool = "truth"
@@ -19,6 +19,7 @@ instance Show KType where
   show KVoid = "empty"
   show KChar = "letter"
   show (KFun (args, returns))= foldl1' (++ ) (map show args) ++ "->"++ foldl1' ( ++) (map show returns)
+  show (OneOf i e )= "one of " ++ show i ++ " or "++ show e
 -- | Arithmetic operators
 data Operator
   = Add
@@ -58,6 +59,8 @@ data KittyAST
   | NotEqual KittyAST KittyAST
   | LessEq KittyAST KittyAST
   | GreaterEq KittyAST KittyAST
+  | If KittyAST [KittyAST]
+  | IfElse KittyAST [KittyAST][KittyAST]
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition
@@ -135,6 +138,9 @@ instance ProgramOutput KittyAST where
   toOutput (Xor e1 e2) = toOutput e1 ++ " xor " ++ toOutput e2
   toOutput (Not e) = "not " ++ toOutput e
   toOutput (Letter c) = show c
+  toOutput (If condition ifblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) 
+  toOutput (IfElse condition ifblock elseblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) ++ "\nelse\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) elseblock) 
+
 
 opSymb :: Operator -> Char
 opSymb Add = '+'

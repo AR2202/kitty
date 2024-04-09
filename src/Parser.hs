@@ -1,11 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (intParser, parseAsInt, parseAsFloat, parseAsOperator, parseAsAST) where
+module Parser (intParser, parseAsInt, parseAsFloat, parseAsOperator, parseAsAST, parseAsIf, parseAsIfCond, parseIfBlock) where
 
 -- import qualified Data.Text as T
 
 -- import Text.Parsec.Expr
 
+import Control.Monad (guard, void)
 import qualified Data.Text as T
 import KittyTypes
 import Text.Parsec
@@ -218,17 +219,45 @@ assignmentParser =
 astAssignParser :: Parser KittyAST
 astAssignParser = DefType <$> assignmentParser
 
+{-if statements-}
+
+-- | if parser
+ifParser :: Parser KittyAST
+ifParser = If <$> ifCondParser <*> ifBlockParser
+
+elseParser :: Parser KittyAST
+elseParser = IfElse <$> ifCondParser <*> ifBlockParser <*> elseBlockParser
+
+ifCondParser = between (spaces *> string "if" <* spaces) (lookAhead (spaces *> string "then" <* spaces)) astSubParser
+
+ifBlockParser = between (spaces *> string "then" <* spaces) (spaces *> (try (string "endif")) <|> (lookAhead (string "else")) <* spaces) (many astSubParser'')
+
+elseBlockParser = between (spaces *> string "else" <* spaces) (spaces *> string "endif" <* spaces) (many astSubParser'')
+
 -- | parse variables
 varParser :: Parser KittyAST
-varParser = Variable <$> (spaces *> many1 alphaNum <* spaces)
+varParser = do
+  void spaces
+  firstChar <- alphaNum
+  rest <- many1 alphaNum
+  let varname = firstChar : rest
+  void space <|> eof <|> void endOfLine <|> void tab
+  void spaces
+  guard (varname `notElem` keywords)
+  return $ Variable varname
+  where
+    keywords = ["if", "else", "endif", "then"]
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try boolopParser <|> try charParser <|> try stringParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+astParser = try elseParser <|> try ifParser <|> try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try boolopParser <|> try charParser <|> try stringParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser :: Parser KittyAST
 astSubParser = try boolopParser <|> try addParser <|> try mulParser <|> try parensParser <|> try compParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+
+astSubParser'' :: Parser KittyAST
+astSubParser'' = try addParser <|> try mulParser <|> try parensParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> try varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser' :: Parser KittyAST
@@ -254,6 +283,14 @@ parseAsExp = parse exprParser "no file" -}
 -- | parsing an ast input - no file
 parseAsAST :: T.Text -> Either ParseError KittyAST
 parseAsAST = parse astParser "no file"
+
+parseAsIf :: T.Text -> Either ParseError KittyAST
+parseAsIf = parse (try elseParser <|> ifParser) "no file"
+
+parseAsIfCond :: T.Text -> Either ParseError KittyAST
+parseAsIfCond = parse ifCondParser "no file"
+
+parseIfBlock = parse ifBlockParser "no file"
 
 {- -- | parsing a Boolean Expression from console input - no file
 parseAsBool :: T.Text -> Either ParseError KittyAST
