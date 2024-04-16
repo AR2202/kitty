@@ -1,5 +1,6 @@
 module Evaluator (parseEvalAndPrintResult, parseEvalPrintMultiline, parseRepl, initialEnv) where
 
+import Data.Foldable (foldl1)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import KittyTypes
@@ -19,7 +20,7 @@ eval env (If b e) = case evalExpression env b of
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
 eval env (IfElse b i e) = case evalExpression env b of
-  Right (BoolLit False) ->  evalMultiple env e
+  Right (BoolLit False) -> evalMultiple env e
   Right (BoolLit True) -> evalMultiple env i
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
@@ -94,6 +95,10 @@ evalExpression env (NotEqual e1 e2) = case evalExpression env e1 of
   Right e -> evalExpression env e2 >>= \x -> evalExpression env (NotEqual e x)
 evalExpression env (StrLit s) = Right (StrLit s)
 evalExpression env (Letter c) = Right (Letter c)
+evalExpression env (IfElse b i e) = case evalExpression env b of
+  Right (BoolLit False) -> evalMultipleExpr env e
+  Right (BoolLit True) -> evalMultipleExpr env i
+  Left err -> Left err
 
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of
@@ -124,6 +129,10 @@ parseEvalAndPrintResult text = case evalAndPrintResult initialEnv <$> parseAsAST
 evalMultiple :: Foldable t => Env -> t KittyAST -> Either KittyError Env
 evalMultiple env astlist = foldl (\env' e -> env' >>= (flip eval) e) (Right env) astlist
 
+evalMultipleExpr :: Foldable t => Env -> t KittyAST -> Either KittyError KittyAST
+evalMultipleExpr env astlist = case evalMultiple env astlist of 
+  Left err -> Left err 
+  Right env' -> Right $ _tmpResult env'
 parseEvalMultiline :: T.Text -> Either KittyError Env
 parseEvalMultiline text = case traverse parseAsAST $ T.lines text of
   Right asts -> evalMultiple initialEnv asts

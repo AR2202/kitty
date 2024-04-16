@@ -200,8 +200,11 @@ assignmentParser =
     <$> (spaces *> many1 alphaNum <* spaces)
     <* (char '=' >> noneOf "=<>")
     <*> ( spaces
-            *> ( try stringParser
+            *> ( try elseParser
+                   <|> try ifParser
+                   <|> try stringParser
                    <|> try charParser
+                   <|> try astSubParser
                    <|> try boolopParser
                    <|> try addParser
                    <|> try mulParser

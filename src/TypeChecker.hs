@@ -13,12 +13,16 @@ import KittyTypes (KittyAST, KittyError)
 import Parser
 
 {-This is the type checker of the kitty language-}
+
+-- | initial empty type environment
 initialTypeEnv :: TypeEnv
 initialTypeEnv = TypeEnv M.empty M.empty
 
 class TypeCheckable t where
   typeOf :: t -> TypeEnv -> Either KittyError KType
 
+-- | the main part of the Typechecker. Checks an AST and produces
+--  | either a type or an error
 instance TypeCheckable KittyAST where
   typeOf None _ = Right KVoid
   typeOf (StrLit s) _ = Right KString
@@ -126,6 +130,7 @@ typeCheck env text = case parseAsAST text of
 typeCheckPrint :: T.Text -> String
 typeCheckPrint = show . typeCheck initialTypeEnv
 
+-- | Type checks the parsed text and converts the error or the type to a string
 typeCheckOutput :: TypeEnv -> T.Text -> String
 typeCheckOutput env text = case typeCheck env text of
   Right x -> show x
@@ -139,6 +144,7 @@ updateTypeEnv tenv text = case parseAsAST text of
     Left err -> Left err
   Right ast -> (,) tenv <$> typeOf ast tenv
 
+-- | inserts a variable into the type environment and produces a new type environment or an error
 updateTypeEnv' :: TypeEnv -> KittyAST -> Either KittyError TypeEnv
 updateTypeEnv' tenv (DefType (AssignDef varname e)) = case typeOf e tenv of
   Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)})
@@ -149,6 +155,7 @@ updateTypeEnv' tenv e = case typeOf e tenv of
 
 {-helper functions-}
 
+-- | produces a string of the value after unwrapping from Either
 showUnwrapped :: (Show a, Show b) => Either a b -> String
 showUnwrapped (Left x) = show x
 showUnwrapped (Right y) = show y
