@@ -10,6 +10,7 @@ import KittyTypes
 import Parser
 import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 import TypeChecker
+import System.IO (hFlush, stdout)
 
 repl :: IO ()
 repl = do
@@ -25,8 +26,10 @@ repl = do
 
 repl' :: Env -> TypeEnv -> IO ()
 repl' env tenv = do
-  putStr "kitty>:X)"
+  putStr "kitty>:X)" 
+  hFlush stdout
   input <- getLine
+
   case input of
     "quit" -> putStrLn "goodbye!"
     "help" -> do
