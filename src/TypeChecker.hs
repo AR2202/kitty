@@ -7,10 +7,10 @@ import Data.Functor.Contravariant (Comparison)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Evaluator (initialEnv)
+import Foreign.C (eNODEV)
 import KittyTypes
 import KittyTypes (KittyAST, KittyError)
 import Parser
-import Foreign.C (eNODEV)
 
 {-This is the type checker of the kitty language-}
 
@@ -146,14 +146,21 @@ updateTypeEnv tenv text = case parseAsAST text of
     Right t -> makeEitherTuple (updateManyTypeEnv tenv e) t
     Left err -> Left err
   Right (IfElse c i e) -> case typeCheck tenv text of
-    Right t -> makeEitherTuple (unifyMaybeTypeEnvs (updateManyTypeEnv tenv i)(updateManyTypeEnv tenv e)) t
+    Right t -> makeEitherTuple (unifyMaybeTypeEnvs (updateManyTypeEnv tenv i) (updateManyTypeEnv tenv e)) t
     Left err -> Left err
   Right ast -> (,) tenv <$> typeOf ast tenv
 
-unifyTypeEnvs tenv1 tenv2 = tenv1 {_varTypes = M.unionWith OneOf (_varTypes tenv1)(_varTypes tenv2)}
-unifyMaybeTypeEnvs (Left e) _ = Left e 
-unifyMaybeTypeEnvs _ (Left e) = Left e 
+unifyTypeEnvs :: TypeEnv -> TypeEnv -> TypeEnv
+unifyTypeEnvs tenv1 tenv2 = tenv1 {_varTypes = M.unionWith oneOfIfDifferent (_varTypes tenv1) (_varTypes tenv2)}
+
+oneOfIfDifferent :: KType -> KType -> KType
+oneOfIfDifferent type1 type2 = if type1 == type2 then type1 else OneOf type1 type2
+
+unifyMaybeTypeEnvs :: Either a TypeEnv -> Either a TypeEnv -> Either a TypeEnv
+unifyMaybeTypeEnvs (Left e) _ = Left e
+unifyMaybeTypeEnvs _ (Left e) = Left e
 unifyMaybeTypeEnvs (Right e1) (Right e2) = Right (unifyTypeEnvs e1 e2)
+
 makeEitherTuple :: Monad f => f a1 -> a2 -> f (a1, a2)
 makeEitherTuple eithera b = (,) <$> eithera <*> return b
 
