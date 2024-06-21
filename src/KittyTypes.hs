@@ -93,7 +93,7 @@ instance Show KittyError where
 type Defs = M.Map String KittyAST
 type FType = M.Map String KType -- should always be KFun
 type VType = M.Map String KType
-data Env = Env {_defnitions :: Defs, _variables :: Defs, _tmpResult :: KittyAST} deriving (Show)
+data Env = Env {_definitions :: Defs, _variables :: Defs, _tmpResult :: KittyAST} deriving (Show)
 data TypeEnv = TypeEnv {_functionTypes :: FType, _varTypes :: VType}  deriving (Show, Read, Eq)
 class ArithOperations a where
   add :: a -> a -> a

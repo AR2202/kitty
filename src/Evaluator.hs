@@ -1,4 +1,4 @@
-module Evaluator (parseEvalAndPrintResult, parseEvalPrintMultiline, parseRepl, initialEnv) where
+module Evaluator (parseEvalAndPrintResult, parseEvalPrintMultiline, parseRepl, evalMultiple, initialEnv) where
 
 import Data.Foldable (foldl1)
 import qualified Data.Map as M

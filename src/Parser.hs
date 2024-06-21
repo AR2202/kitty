@@ -260,7 +260,7 @@ astSubParser :: Parser KittyAST
 astSubParser = try boolopParser <|> try addParser <|> try mulParser <|> try parensParser <|> try compParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
 
 astSubParser'' :: Parser KittyAST
-astSubParser'' = try addParser <|> try mulParser <|> try parensParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> try varParser
+astSubParser'' = try astAssignParser <|>try addParser <|> try mulParser <|> try parensParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> try varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser' :: Parser KittyAST
