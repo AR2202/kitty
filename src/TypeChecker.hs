@@ -1,7 +1,7 @@
 module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv) where
 
 import Control.Exception (TypeError)
-import Control.Monad (foldM)
+import Control.Monad (foldM, void)
 import Data.Bits (Bits (xor))
 import Data.Functor.Contravariant (Comparison)
 import qualified Data.Map as M
@@ -11,6 +11,7 @@ import Foreign.C (eNODEV)
 import KittyTypes
 import KittyTypes (KittyAST, KittyError)
 import Parser
+import qualified Data.Type.Bool as encountered
 
 {-This is the type checker of the kitty language-}
 
@@ -120,6 +121,8 @@ instance TypeCheckable Definition where
   typeOf (AssignDef varname e) env = typeOf e env
   typeOf _ _ = Left $ UndefinedError "not yet implemented"
 
+{-type checking functions functions-}
+
 -- | parsers and type checks
 typeCheck :: TypeEnv -> T.Text -> Either KittyError KType
 typeCheck env text = case parseAsAST text of
@@ -136,6 +139,10 @@ typeCheckOutput env text = case typeCheck env text of
   Right x -> show x
   Left x -> show x
 
+-- | handles different cases of the AST types to update type environment, and return type 
+-- | updates Type environment only if a definition or if/else block is encountered
+-- | otherwise, keeps the type enviornment unchanged
+-- | also returns the type of the expression for type checking
 updateTypeEnv :: TypeEnv -> T.Text -> Either KittyError (TypeEnv, KType)
 updateTypeEnv tenv text = case parseAsAST text of
   Left _ -> Left $ ParseError (T.unpack text)
@@ -150,20 +157,36 @@ updateTypeEnv tenv text = case parseAsAST text of
     Left err -> Left err
   Right ast -> (,) tenv <$> typeOf ast tenv
 
+-- | combines two typeEnvs by combining their variable type lookup tables
+-- | if variable names collide, creates a OneOf of both types if types are different
 unifyTypeEnvs :: TypeEnv -> TypeEnv -> TypeEnv
-unifyTypeEnvs tenv1 tenv2 = tenv1 {_varTypes = M.unionWith oneOfIfDifferent (_varTypes tenv1) (_varTypes tenv2)}
+unifyTypeEnvs tenv1 tenv2 = tenv1 {_varTypes = M.map (unwrapOneOfIfEqual . oneOfVoidIfMissing) $ M.unionWith OneOf (_varTypes tenv1) (_varTypes tenv2)}
 
+-- | wraps two types in a OneOf if and only if they are different
 oneOfIfDifferent :: KType -> KType -> KType
 oneOfIfDifferent type1 type2 = if type1 == type2 then type1 else OneOf type1 type2
 
+-- | unwraps OneOf if the two contained types are equal
+unwrapOneOfIfEqual :: KType -> KType
+unwrapOneOfIfEqual (OneOf type1 type2) = if type1 == type2 then type1 else OneOf type1 type2
+unwrapOneOfIfEqual x = x
+
+-- | wraps a KType in OneOf, adding KVoid for the second type
+oneOfVoidIfMissing :: KType -> KType
+oneOfVoidIfMissing (OneOf a b) = OneOf a b
+oneOfVoidIfMissing x = OneOf x KVoid
+
+-- | unifies two values of Type Either a TypeEnv into one
 unifyMaybeTypeEnvs :: Either a TypeEnv -> Either a TypeEnv -> Either a TypeEnv
 unifyMaybeTypeEnvs (Left e) _ = Left e
 unifyMaybeTypeEnvs _ (Left e) = Left e
 unifyMaybeTypeEnvs (Right e1) (Right e2) = Right (unifyTypeEnvs e1 e2)
 
+-- | helper function for making a tuple of two values where the first is an Either a b
 makeEitherTuple :: Monad f => f a1 -> a2 -> f (a1, a2)
 makeEitherTuple eithera b = (,) <$> eithera <*> return b
 
+-- | fold the updateTupeEnv' function over a foldable of KittyAST (e.g. a list)
 updateManyTypeEnv :: Foldable t => TypeEnv -> t KittyAST -> Either KittyError TypeEnv
 updateManyTypeEnv tenv e = foldl (\tenv' e' -> tenv' >>= flip updateTypeEnv' e') (return tenv) e
 
