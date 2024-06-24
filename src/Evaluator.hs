@@ -9,9 +9,12 @@ import Text.Parsec.Error
 
 {-This is the definition of the evaluation
 a tree-walk interpreter to traverse and execute the AST-}
+
+-- | initial empty program environment
 initialEnv :: Env
 initialEnv = Env M.empty M.empty None
 
+-- | the evaluation function
 eval :: Env -> KittyAST -> Either KittyError Env
 eval env (DefType (AssignDef varname vardef)) = Right $ env {_variables = M.insert varname vardef (_variables env)}
 eval env (If b e) = case evalExpression env b of
@@ -28,6 +31,7 @@ eval env e = case evalExpression env e of
   Left err -> Left err
   Right res -> Right $ env {_tmpResult = res}
 
+-- | evaluates the AST to an error or a new AST
 evalExpression :: Env -> KittyAST -> Either KittyError KittyAST
 evalExpression _ (IntLit i) = Right $ IntLit i
 evalExpression _ (Expr op (IntLit i) (IntLit j)) = Right $ IntLit $ evalOp op i j
@@ -100,13 +104,17 @@ evalExpression env (IfElse b i e) = case evalExpression env b of
   Right (BoolLit True) -> evalMultipleExpr env i
   Left err -> Left err
 
+-- | looking up variable in program environment
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of
   Nothing -> Left $ DoesNotExistError $ "the variable " ++ v ++ " does not exist"
   Just val -> Right val
 
+-- | evaluates the AST and converts the resulting environment to a string
+-- | for debugging
 evalAndPrintEnv :: Env -> KittyAST -> String
 evalAndPrintEnv e a = show (eval e a)
+
 
 evalAndPrintResult :: Env -> KittyAST -> Either KittyError String
 evalAndPrintResult e a = toOutput . _tmpResult <$> eval e a

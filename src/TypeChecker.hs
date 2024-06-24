@@ -11,7 +11,7 @@ import Foreign.C (eNODEV)
 import KittyTypes
 import KittyTypes (KittyAST, KittyError)
 import Parser
-import qualified Data.Type.Bool as encountered
+
 
 {-This is the type checker of the kitty language-}
 

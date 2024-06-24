@@ -12,6 +12,7 @@ import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 import TypeChecker
 import System.IO (hFlush, stdout)
 
+-- | the entry point of the Kitty REPL
 repl :: IO ()
 repl = do
   putStrLn "Wecome to Kitty!"
@@ -24,6 +25,7 @@ repl = do
   putStrLn "or simply enter your kitty code >:X)"
   repl' initialEnv initialTypeEnv
 
+-- | the actual REPL
 repl' :: Env -> TypeEnv -> IO ()
 repl' env tenv = do
   putStr "kitty>:X)" 

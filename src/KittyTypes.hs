@@ -141,7 +141,8 @@ instance ProgramOutput KittyAST where
   toOutput (If condition ifblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) 
   toOutput (IfElse condition ifblock elseblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) ++ "\nelse\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) elseblock) 
 
-
+-- | convert operator to the char representing it
+-- | used for printing an operator
 opSymb :: Operator -> Char
 opSymb Add = '+'
 opSymb Mult = '*'
