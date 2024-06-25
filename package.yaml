@@ -24,6 +24,8 @@ dependencies:
 - parsec
 - text
 - containers
+- QuickCheck
+- hspec
 
 ghc-options:
 - -Wall
