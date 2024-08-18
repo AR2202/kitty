@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (intParser, parseAsInt, parseAsFloat, parseAsAdd,parseAsOperator,parseAsASTTest, parseAsBoolOp, parseAsAST, parseAsIf, parseAsIfCond, parseIfBlock) where
+module Parser (intParser, parseAsInt, parseAsFloat, parseAsAdd, parseAsOperator, parseAsASTTest, parseAsBoolOp, parseAsAST, parseAsIf, parseAsIfCond, parseIfBlock) where
 
 -- import qualified Data.Text as T
 
@@ -62,26 +62,30 @@ divop =
   Expr Div
     <$ char
       '/'
+
 chainl1' :: ParsecT s u m t -> ParsecT s u m (t -> t -> t) -> ParsecT s u m b
 chainl1' p op = do
   x <- p
   rest x
   where
-    rest x = (do
-                f <- op
-                y <- p
-                rest (f x y))
-             <|> parserFail "Operator required"
+    rest x =
+      ( do
+          f <- op
+          y <- p
+          rest (f x y)
+      )
+        <|> parserFail "Operator required"
+
 muldiv :: Parser (KittyAST -> KittyAST -> KittyAST)
 muldiv = mulop <|> divop
 
 -- | parsing multiplication or division with left association
 mulParser :: Parser KittyAST
-mulParser = chainl1 (try parensParser <|> try floatParser <|> try intParser  <|> varParser) muldiv
+mulParser = chainl1 (try parensParser <|> try floatParser <|> try intParser <|> varParser) muldiv
 
 -- | parsing addition or subtraction as left associative
 addParser :: Parser KittyAST
-addParser = chainl1 (try notParser <|> try trueParser <|> try falseParser <|>try mulParser <|> try parensParser  <|> try floatParser <|> try intParser<|> try stringParser <|> try charParser <|> varParser) addsub
+addParser = chainl1 (try notParser <|> try trueParser <|> try falseParser <|> try mulParser <|> try parensParser <|> try floatParser <|> try intParser <|> try stringParser <|> try charParser <|> varParser) addsub
 
 -- | parsing parentheses
 parensParser :: Parser KittyAST
@@ -137,7 +141,7 @@ boolop = andop <|> xorop <|> orop
 
 -- | parsing boolean operations with left association
 boolopParser :: Parser KittyAST
-boolopParser = chainl1 (try parensParser <|> try notParser <|> try falseParser <|> try trueParser  <|> varParser) boolop
+boolopParser = chainl1 (try parensParser <|> try notParser <|> try falseParser <|> try trueParser <|> varParser) boolop
 
 -- | parsing boolean operations with left association
 
@@ -251,7 +255,7 @@ varParser :: Parser KittyAST
 varParser = do
   void spaces
   firstChar <- alphaNum
-  rest <- many1 alphaNum
+  rest <- many alphaNum
   let varname = firstChar : rest
   void space <|> eof <|> void endOfLine <|> void tab
   void spaces
@@ -262,20 +266,21 @@ varParser = do
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try elseParser <|> try ifParser <|> try astAssignParser <|> try compParser <|>    try addParser <|> try mulParser  <|>try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+astParser = try elseParser <|> try ifParser <|> try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+
 astTestParser :: Parser KittyAST
-astTestParser = try elseParser <|> try ifParser <|> try astAssignParser<|> try compParser   <|> try boolopParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+astTestParser = try elseParser <|> try ifParser <|> try astAssignParser <|> try compParser <|> try boolopParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser :: Parser KittyAST
-astSubParser =  try addParser <|> try mulParser <|> try parensParser <|> try compParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+astSubParser = try addParser <|> try mulParser <|> try parensParser <|> try compParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
 
 astSubParser'' :: Parser KittyAST
 astSubParser'' = try astAssignParser <|> try addParser <|> try mulParser <|> try parensParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> try varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser' :: Parser KittyAST
-astSubParser' = try addParser <|> try mulParser <|> try parensParser  <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+astSubParser' = try addParser <|> try mulParser <|> try parensParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
 
 {- helper function to test parsing in the console-}
 
@@ -295,24 +300,22 @@ parseAsBoolOp = parse boolopParser "no file"
 
 parseAsAdd :: T.Text -> Either ParseError KittyAST
 parseAsAdd = parse addParser "no file"
-{- -- | parsing an Expression from console input - no file
-parseAsExp :: T.Text -> Either ParseError KittyAST
-parseAsExp = parse exprParser "no file" -}
+
+
 
 -- | parsing an ast input - no file
 parseAsAST :: T.Text -> Either ParseError KittyAST
 parseAsAST = parse astParser "no file"
+
 parseAsASTTest :: T.Text -> Either ParseError KittyAST
 parseAsASTTest = parse astTestParser "no file"
+
 parseAsIf :: T.Text -> Either ParseError KittyAST
 parseAsIf = parse (try elseParser <|> ifParser) "no file"
 
 parseAsIfCond :: T.Text -> Either ParseError KittyAST
 parseAsIfCond = parse ifCondParser "no file"
 
+parseIfBlock :: T.Text -> Either ParseError [KittyAST]
 parseIfBlock = parse ifBlockParser "no file"
 
-{- -- | parsing a Boolean Expression from console input - no file
-parseAsBool :: T.Text -> Either ParseError KittyAST
-parseAsBool = parse boolParser "no file"
- -}
