@@ -5,11 +5,14 @@ module KittyTypes (Operator (..), KittyAST (..), Env (..), TypeEnv(..),KittyErro
 import Data.Char (toLower)
 import qualified Data.Map as M
 import Data.List(foldl1')
+import Text.ParserCombinators.ReadP
+import Data.Char (isSpace)
+import Control.Applicative ((<|>))
 
 {- This file defines the Types and Values of a kitty programm-}
 
 -- | Kitty Types
-data KType = KBool | KInt | KFloat | KString | KChar | KVoid | OneOf KType KType | KFun ([KType],[KType]) deriving (Read, Eq)
+data KType = KBool | KInt | KFloat | KString | KChar | KVoid | OneOf KType KType | KFun ([KType],[KType]) deriving ( Eq)
 
 instance Show KType where
   show KBool = "truth"
@@ -20,6 +23,73 @@ instance Show KType where
   show KChar = "letter"
   show (KFun (args, returns))= foldl1' (++ ) (map show args) ++ "->"++ foldl1' ( ++) (map show returns)
   show (OneOf i e )= "one of " ++ show i ++ " or "++ show e
+instance Read KType where
+    readsPrec _ = readP_to_S parseKType
+
+parseKType :: ReadP KType
+parseKType = parseKBool
+         <|> parseKInt
+         <|> parseKFloat
+         <|> parseKString
+         <|> parseKChar
+         <|> parseKVoid
+         -- <|> parseKFun
+         <|> parseOneOf
+
+parseKBool :: ReadP KType
+parseKBool = do
+    skipSpaces
+    _ <- string "truth"
+    return KBool
+
+parseKInt :: ReadP KType
+parseKInt = do
+    skipSpaces
+    _ <- string "wholeNumber"
+    return KInt
+
+parseKFloat :: ReadP KType
+parseKFloat = do
+    skipSpaces
+    _ <- string "decimalNumber"
+    return KFloat
+
+parseKString :: ReadP KType
+parseKString = do
+    skipSpaces
+    _ <- string "text"
+    return KString
+
+parseKChar :: ReadP KType
+parseKChar = do
+    skipSpaces
+    _ <- string "letter"
+    return KChar
+
+parseKVoid :: ReadP KType
+parseKVoid = do
+    skipSpaces
+    _ <- string "empty"
+    return KVoid
+
+-- parseKFun :: ReadP KType
+-- parseKFun = do
+--     args <- sepBy1 parseKType (skipSpaces >> return ())
+--     _ <- skipSpaces >> string "->" >> skipSpaces
+--     returns <- sepBy1 parseKType (skipSpaces >> return ())
+--     return $ KFun (args, returns)
+
+parseOneOf :: ReadP KType
+parseOneOf = do
+    _ <- string "one of"
+    skipSpaces
+    i <- parseKType
+    skipSpaces
+    _ <- string "or"
+    skipSpaces
+    e <- parseKType
+    return $ OneOf i e
+
 -- | Arithmetic operators
 data Operator
   = Add
@@ -61,6 +131,7 @@ data KittyAST
   | GreaterEq KittyAST KittyAST
   | If KittyAST [KittyAST]
   | IfElse KittyAST [KittyAST][KittyAST]
+  | UnwrapAs KittyAST KType -- for unwrapping OneOfs 
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition

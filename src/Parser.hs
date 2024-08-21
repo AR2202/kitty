@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (intParser, parseAsInt, parseAsFloat, parseAsAdd, parseAsOperator, parseAsASTTest, parseAsBoolOp, parseAsAST, parseAsIf, parseAsIfCond, parseIfBlock) where
+module Parser (intParser, parseUnwrap, parseAsInt, parseAsFloat, parseAsAdd, parseAsOperator, parseAsASTTest, parseAsBoolOp, parseAsAST, parseAsIf, parseAsIfCond, parseIfBlock) where
 
 -- import qualified Data.Text as T
 
@@ -250,6 +250,16 @@ ifBlockParser = between (spaces *> string "then" <* spaces) (spaces *> (try (str
 
 elseBlockParser = between (spaces *> string "else" <* spaces) (spaces *> string "endif" <* spaces) (many astSubParser'')
 
+-- | parse unwrap
+unwrapVarParser = between (spaces *> string "unwrap"<* spaces)(lookAhead(spaces *> string "as" <* spaces)) varParser
+unwrappedTypeParser = between (spaces *> string "as"<* spaces)(spaces *> string "endunwrap" <* spaces) typeParser
+
+unwrapParser = UnwrapAs <$> unwrapVarParser <*> unwrappedTypeParser
+-- | type name parser 
+-- no support for OneOf yet
+typeParser :: Parser KType 
+typeParser =  read <$> (try (string "wholeNumber")<|> try (string "truth")<|>try (string"decimalNumber")<|> try( string "text")<|> try (string "empty"
+ ) <|> string"letter")
 -- | parse variables
 varParser :: Parser KittyAST
 varParser = do
@@ -319,3 +329,4 @@ parseAsIfCond = parse ifCondParser "no file"
 parseIfBlock :: T.Text -> Either ParseError [KittyAST]
 parseIfBlock = parse ifBlockParser "no file"
 
+parseUnwrap = parse unwrapParser "no file"

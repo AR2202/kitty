@@ -150,7 +150,7 @@ updateTypeEnv tenv text = case parseAsAST text of
     Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)}, t)
     Left err -> Left err
   Right (If c e) -> case typeCheck tenv text of
-    Right t -> makeEitherTuple (updateManyTypeEnv tenv e) t
+    Right t -> makeEitherTuple  (unifyMaybeTypeEnvs (updateManyTypeEnv tenv e) ( Right tenv)) t
     Left err -> Left err
   Right (IfElse c i e) -> case typeCheck tenv text of
     Right t -> makeEitherTuple (unifyMaybeTypeEnvs (updateManyTypeEnv tenv i) (updateManyTypeEnv tenv e)) t
