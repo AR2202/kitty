@@ -252,14 +252,15 @@ elseBlockParser = between (spaces *> string "else" <* spaces) (spaces *> string 
 
 -- | parse unwrap
 unwrapVarParser = between (spaces *> string "unwrap"<* spaces)(lookAhead(spaces *> string "as" <* spaces)) varParser
-unwrappedTypeParser = between (spaces *> string "as"<* spaces)(spaces *> string "endunwrap" <* spaces) typeParser
+unwrappedTypeParser = between (spaces *> string "as"<* spaces)(spaces *> string "named" <* spaces) typeParser
 
-unwrapParser = UnwrapAs <$> unwrapVarParser <*> unwrappedTypeParser
+unwrapParser = UnwrapAs <$> unwrapVarParser <*> unwrappedTypeParser<*> many1 alphaNum <*> unwrapBlockParser
 -- | type name parser 
 -- no support for OneOf yet
 typeParser :: Parser KType 
 typeParser =  read <$> (try (string "wholeNumber")<|> try (string "truth")<|>try (string"decimalNumber")<|> try( string "text")<|> try (string "empty"
  ) <|> string"letter")
+unwrapBlockParser = between (spaces *> string "andDo" <* spaces) (spaces *> string "endunwrap" <* spaces) (many astSubParser'')
 -- | parse variables
 varParser :: Parser KittyAST
 varParser = do
@@ -272,11 +273,11 @@ varParser = do
   guard (varname `notElem` keywords)
   return $ Variable varname
   where
-    keywords = ["if", "else", "endif", "then"]
+    keywords = ["if", "else", "endif", "then", "endunwrap", "andDo"]
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try elseParser <|> try ifParser <|> try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+astParser = try elseParser <|> try ifParser <|> try unwrapParser <|> try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
 
 astTestParser :: Parser KittyAST
 astTestParser = try elseParser <|> try ifParser <|> try astAssignParser <|> try compParser <|> try boolopParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser

@@ -11,6 +11,7 @@ import Foreign.C (eNODEV)
 import KittyTypes
 import KittyTypes (KittyAST, KittyError)
 import Parser
+import Control.Exception.Base (typeError)
 
 
 {-This is the type checker of the kitty language-}
@@ -111,7 +112,15 @@ instance TypeCheckable KittyAST where
       checkIfType statements = case foldM updateTypeEnv' env statements of
         Left err -> Left err
         Right env' -> typeOf (last statements) env'
-
+  typeOf (UnwrapAs vname typename unwrappedName doBlock) env =
+    case typeOf vname env of 
+      Right (OneOf x y) -> if (typename == x) || (typename == y) then checkBlockType doBlock (env{_varTypes = M.insert unwrappedName typename (_varTypes env)})
+      else Left $TypeError ("One of " ++ show x ++ " and "++ show y ++" can't be unwrapped to " ++ show typename)
+      _ ->Left $ TypeError $"trying to unwrap a value of type "++showUnwrapped (typeOf vname env)++"; only One of type can be unwrapped"
+checkBlockType [] _ = Right KVoid
+checkBlockType statements env = case foldM updateTypeEnv' env statements of
+        Left err -> Left err
+        Right env' -> typeOf (last statements) env'
 instance TypeCheckable FunctionCall where
   typeOf (FunctionCall fnName fnParams) env = case M.lookup fnName (_functionTypes env) of
     Nothing -> Left $ UndefinedError ("no function named " ++ fnName)

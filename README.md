@@ -58,7 +58,11 @@ Eg.
 The variable myvar would then have type oneOf wholeNumber or text and has to be destructured before use. This would result in a type error:
 
 `myvar + 2`
+typeError: 
 
+To unwrap a oneOf:
+
+`unwrap myvar as wholeNumber named myUnwrappedVar andDo myUnwrappedVar + 2 endunwrap`
 
 If the different branches assign the same type to the variable, kitty unifies them automatically and unwraps them from the oneOf. This works:
 

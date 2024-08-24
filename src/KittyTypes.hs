@@ -131,7 +131,7 @@ data KittyAST
   | GreaterEq KittyAST KittyAST
   | If KittyAST [KittyAST]
   | IfElse KittyAST [KittyAST][KittyAST]
-  | UnwrapAs KittyAST KType -- for unwrapping OneOfs 
+  | UnwrapAs KittyAST KType String [KittyAST] -- for unwrapping OneOfs 
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition

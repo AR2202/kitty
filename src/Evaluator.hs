@@ -22,6 +22,11 @@ eval env (If b e) = case evalExpression env b of
   Right (BoolLit True) -> evalMultiple env e
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
+-- eval env (UnwrapAs vname typename unwrappedName doBlock) = case evalExpression env b of
+--   Right (BoolLit False) -> Right env
+--   Right (BoolLit True) -> evalMultiple env e
+--   Left err -> Left err
+--   _ -> Left $ TypeError "Condition must have type truth"
 eval env (IfElse b i e) = case evalExpression env b of
   Right (BoolLit False) -> evalMultiple env e
   Right (BoolLit True) -> evalMultiple env i
