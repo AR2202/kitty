@@ -6,6 +6,7 @@ import qualified Data.Text as T
 import KittyTypes
 import Parser
 import Text.Parsec.Error
+import TypeChecker(typeOf, initialTypeEnv)
 
 {-This is the definition of the evaluation
 a tree-walk interpreter to traverse and execute the AST-}
@@ -22,11 +23,13 @@ eval env (If b e) = case evalExpression env b of
   Right (BoolLit True) -> evalMultiple env e
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
--- eval env (UnwrapAs vname typename unwrappedName doBlock) = case evalExpression env b of
---   Right (BoolLit False) -> Right env
---   Right (BoolLit True) -> evalMultiple env e
---   Left err -> Left err
---   _ -> Left $ TypeError "Condition must have type truth"
+eval env (UnwrapAs vname typename unwrappedName doBlock) = case evalExpression env  vname  of
+--the value bound to the variable vname has to be retrieved and type-checked 
+  Left err -> Left err
+  Right x -> case typeOf x initialTypeEnv of
+     Left err -> Left err
+     Right tname -> if tname == typename then evalMultiple (env{_variables = M.insert unwrappedName x (_variables env)}) doBlock else Right env
+
 eval env (IfElse b i e) = case evalExpression env b of
   Right (BoolLit False) -> evalMultiple env e
   Right (BoolLit True) -> evalMultiple env i

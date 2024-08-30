@@ -1,3 +1,4 @@
+{-# LANGUAGE InstanceSigs #-}
 module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv) where
 
 import Control.Exception (TypeError)
@@ -6,7 +7,7 @@ import Data.Bits (Bits (xor))
 import Data.Functor.Contravariant (Comparison)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Evaluator (initialEnv)
+
 import Foreign.C (eNODEV)
 import KittyTypes
 import KittyTypes (KittyAST, KittyError)
@@ -122,6 +123,7 @@ checkBlockType statements env = case foldM updateTypeEnv' env statements of
         Left err -> Left err
         Right env' -> typeOf (last statements) env'
 instance TypeCheckable FunctionCall where
+  typeOf :: FunctionCall -> TypeEnv -> Either KittyError KType
   typeOf (FunctionCall fnName fnParams) env = case M.lookup fnName (_functionTypes env) of
     Nothing -> Left $ UndefinedError ("no function named " ++ fnName)
     Just _ -> Left $ UndefinedError "not yet implemented"
