@@ -1,5 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
-module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv) where
+module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv, checkBlockType) where
 
 import Control.Exception (TypeError)
 import Control.Monad (foldM, void)
@@ -118,6 +118,7 @@ instance TypeCheckable KittyAST where
       Right (OneOf x y) -> if (typename == x) || (typename == y) then checkBlockType doBlock (env{_varTypes = M.insert unwrappedName typename (_varTypes env)})
       else Left $TypeError ("One of " ++ show x ++ " and "++ show y ++" can't be unwrapped to " ++ show typename)
       _ ->Left $ TypeError $"trying to unwrap a value of type "++showUnwrapped (typeOf vname env)++"; only One of type can be unwrapped"
+checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
 checkBlockType statements env = case foldM updateTypeEnv' env statements of
         Left err -> Left err

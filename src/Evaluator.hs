@@ -1,4 +1,4 @@
-module Evaluator (parseEvalAndPrintResult, parseEvalPrintMultiline, parseRepl, evalMultiple, initialEnv) where
+module Evaluator (parseEvalAndPrintResult, parseEvalPrintMultiline, parseRepl, evalMultiple, initialEnv, parseEvalFile) where
 
 import Data.Foldable (foldl1)
 import qualified Data.Map as M
@@ -6,7 +6,7 @@ import qualified Data.Text as T
 import KittyTypes
 import Parser
 import Text.Parsec.Error
-import TypeChecker(typeOf, initialTypeEnv)
+import TypeChecker(typeOf, initialTypeEnv, updateTypeEnv, checkBlockType)
 
 {-This is the definition of the evaluation
 a tree-walk interpreter to traverse and execute the AST-}
@@ -150,8 +150,10 @@ evalMultipleExpr env astlist = case evalMultiple env astlist of
   Left err -> Left err 
   Right env' -> Right $ _tmpResult env'
 parseEvalMultiline :: T.Text -> Either KittyError Env
-parseEvalMultiline text = case traverse parseAsAST $ T.lines text of
-  Right asts -> evalMultiple initialEnv asts
+parseEvalMultiline text = case traverse parseAsAST $ filter (not . T.null) $T.lines text of
+  Right asts -> case checkBlockType asts initialTypeEnv of 
+    Left err -> Left err 
+    _ -> evalMultiple initialEnv asts
   Left _ -> Left $ KittyTypes.ParseError (T.unpack text)
 
 parseEvalPrintMultiline :: T.Text -> IO ()
@@ -163,3 +165,9 @@ parseRepl :: Env -> T.Text -> Either KittyError Env
 parseRepl env text = case traverse parseAsAST $ T.lines text of
   Right asts -> evalMultiple env asts
   Left _ -> Left $ KittyTypes.ParseError (T.unpack text)
+-- | parses and executes code from a file
+-- | currently throws an error if filepath doesn't exit -fix
+parseEvalFile :: String -> IO()
+parseEvalFile filepath = do 
+  contents <- readFile filepath 
+  parseEvalPrintMultiline $ T.pack contents
