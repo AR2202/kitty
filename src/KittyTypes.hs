@@ -132,6 +132,7 @@ data KittyAST
   | If KittyAST [KittyAST]
   | IfElse KittyAST [KittyAST][KittyAST]
   | UnwrapAs KittyAST KType String [KittyAST] -- for unwrapping OneOfs 
+  | While KittyAST [KittyAST]
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition

@@ -44,6 +44,8 @@ repl' env tenv = do
       if "type " `isPrefixOf` input
         then putStrLn (typeCheckOutput tenv (T.pack (drop 5 input))) >> repl' env tenv
         else
+          -- if input starts with the evalFile keyword, 
+            --evaluates the file on the path prvided
         if "evalFile "`isPrefixOf` input
           then parseEvalFile  (drop 9 input) >> repl' env tenv
           else

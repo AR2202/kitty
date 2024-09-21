@@ -17,7 +17,9 @@ initialEnv = Env M.empty M.empty None
 
 -- | the evaluation function
 eval :: Env -> KittyAST -> Either KittyError Env
-eval env (DefType (AssignDef varname vardef)) = Right $ env {_variables = M.insert varname vardef (_variables env)}
+eval env (DefType (AssignDef varname vardef)) = case evalExpression env vardef of 
+  Left err -> Left err 
+  Right def -> Right $ env {_variables = M.insert varname def (_variables env)}
 eval env (If b e) = case evalExpression env b of
   Right (BoolLit False) -> Right env
   Right (BoolLit True) -> evalMultiple env e
