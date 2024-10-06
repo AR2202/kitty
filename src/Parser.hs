@@ -215,6 +215,7 @@ assignmentParser =
     <*> ( spaces
             *> ( try elseParser
                    <|> try ifParser
+                   <|> try whileParser
                    <|> try stringParser
                    <|> try charParser
                    <|> try astSubParser
@@ -244,11 +245,16 @@ ifParser = If <$> ifCondParser <*> ifBlockParser
 elseParser :: Parser KittyAST
 elseParser = IfElse <$> ifCondParser <*> ifBlockParser <*> elseBlockParser
 
+whileParser :: Parser KittyAST
+whileParser = While <$> whileCondParser <*> whileBlockParser
+
 ifCondParser = between (spaces *> string "if" <* spaces) (lookAhead (spaces *> string "then" <* spaces)) astSubParser
+whileCondParser = between (spaces *> string "while" <* spaces) (lookAhead (spaces *> string "do" <* spaces)) astSubParser
 
 ifBlockParser = between (spaces *> string "then" <* spaces) (spaces *> (try (string "endif")) <|> (lookAhead (string "else")) <* spaces) (many astSubParser'')
 
 elseBlockParser = between (spaces *> string "else" <* spaces) (spaces *> string "endif" <* spaces) (many astSubParser'')
+whileBlockParser = between (spaces *> string "do" <* spaces) (spaces *> string "endwhile" <* spaces) (many astSubParser'')
 
 -- | parse unwrap
 unwrapVarParser = between (spaces *> string "unwrap"<* spaces)(lookAhead(spaces *> string "as" <* spaces)) varParser
@@ -273,14 +279,14 @@ varParser = do
   guard (varname `notElem` keywords)
   return $ Variable varname
   where
-    keywords = ["if", "else", "endif", "then", "endunwrap", "andDo"]
+    keywords = ["if", "else", "endif", "then", "endunwrap", "andDo", "do", "while", "endwhile"]
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try elseParser <|> try ifParser <|> try unwrapParser <|> try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+astParser = try elseParser <|> try ifParser <|> try whileParser <|> try unwrapParser <|> try astAssignParser <|> try compParser <|> try addParser <|> try mulParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
 
 astTestParser :: Parser KittyAST
-astTestParser = try elseParser <|> try ifParser <|> try astAssignParser <|> try compParser <|> try boolopParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
+astTestParser = try elseParser <|> try ifParser <|> try whileParser <|> try astAssignParser <|> try compParser <|> try boolopParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser :: Parser KittyAST

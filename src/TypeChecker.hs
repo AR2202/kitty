@@ -118,6 +118,13 @@ instance TypeCheckable KittyAST where
       Right (OneOf x y) -> if (typename == x) || (typename == y) then checkBlockType doBlock (env{_varTypes = M.insert unwrappedName typename (_varTypes env)})
       else Left $TypeError ("One of " ++ show x ++ " and "++ show y ++" can't be unwrapped to " ++ show typename)
       _ ->Left $ TypeError $"trying to unwrap a value of type "++showUnwrapped (typeOf vname env)++"; only One of type can be unwrapped"
+  typeOf (While condition whileblock) env
+    | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for while loop must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
+    | null whileblock = Right KVoid
+    | otherwise = case foldM updateTypeEnv' env whileblock of
+        Left err -> Left err
+        Right env -> typeOf (last whileblock) env -- type of the last expression
+        -- still undecided if this is the desired behaviour
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
 checkBlockType statements env = case foldM updateTypeEnv' env statements of

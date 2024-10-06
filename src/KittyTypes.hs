@@ -212,7 +212,7 @@ instance ProgramOutput KittyAST where
   toOutput (Letter c) = show c
   toOutput (If condition ifblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) 
   toOutput (IfElse condition ifblock elseblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) ++ "\nelse\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) elseblock) 
-
+  toOutput (While condition loopBody) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) loopBody) 
 -- | convert operator to the char representing it
 -- | used for printing an operator
 opSymb :: Operator -> Char
