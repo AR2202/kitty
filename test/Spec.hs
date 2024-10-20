@@ -24,6 +24,7 @@ main = hspec $
     parseboolParens 
     parseboolParensLast
     parseBoolOp
+    parseIfInWhile
     --addFailsWithoutAdd
 
 parseAdd :: Expectation
@@ -111,14 +112,13 @@ parseNestedBool =
 
 boolParensParsedCorrectly :: Expectation
 boolParensParsedCorrectly =
-  -- currently fails
+
   parseAsASTTest "(not false) and true"
     `shouldBe` Right (And (Parens (Not (BoolLit False)))(BoolLit True) )
 
 
 parseboolParens :: SpecWith ()
 parseboolParens =
-  -- currently fails
   describe "parseAsAST" $
     context "when parsing nested boolean expressions" $
       it
@@ -127,14 +127,12 @@ parseboolParens =
 
 boolParensEndParsedCorrectly :: Expectation
 boolParensEndParsedCorrectly =
-  -- currently fails
   parseAsAST "false and (not true)"
     `shouldBe` Right (And (BoolLit False)(Parens (Not (BoolLit True))) )
 
 
 parseboolParensLast :: SpecWith ()
 parseboolParensLast =
-  -- currently fails
   describe "parseAsAST" $
     context "when parsing nested boolean expressions" $
       it
@@ -158,15 +156,27 @@ parseboolParensLast =
 --         addShouldNotParseWithoutSymb    
 boolBoolOpParsedCorrectly :: Expectation
 boolBoolOpParsedCorrectly =
-  -- currently fails
   parseAsBoolOp "(not false) and true"
     `shouldBe` Right (And (Parens (Not (BoolLit False)))(BoolLit True) )
 
 parseBoolOp :: SpecWith ()
 parseBoolOp =
-  -- currently fails
   describe "parseAsAST" $
     context "when parsing nested boolean expressions" $
       it
         "should parse it as And"
         boolBoolOpParsedCorrectly   
+        
+ifInsideWhile :: Expectation
+ifInsideWhile =
+  parseAsAST "if  true  then if true then print(2) endif endif"
+    `shouldBe` Right (If (BoolLit True) [If (BoolLit True) [Print (IntLit 2)]])
+
+parseIfInWhile :: SpecWith ()
+parseIfInWhile =
+
+  describe "parseAsAST" $
+    context "when parsing if nested in while" $
+      it
+        "should parse it is while loop with if"
+        ifInsideWhile  

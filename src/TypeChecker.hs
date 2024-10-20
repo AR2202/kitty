@@ -125,6 +125,7 @@ instance TypeCheckable KittyAST where
         Left err -> Left err
         Right env -> typeOf (last whileblock) env -- type of the last expression
         -- still undecided if this is the desired behaviour
+  typeOf (Print _) _= Right KVoid
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
 checkBlockType statements env = case foldM updateTypeEnv' env statements of
