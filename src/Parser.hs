@@ -298,47 +298,60 @@ printParser = Print <$> between (spaces *> string "print" <* spaces <* string "(
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
-astParser = try printParser 
-  <|> try elseParser 
-  <|> try ifParser 
-  <|> try whileParser 
-  <|> try unwrapParser 
-  <|> try astAssignParser 
-  <|> try compParser 
-  <|> try addParser 
-  <|> try mulParser 
-  <|> try charParser 
-  <|> try stringParser 
-  <|> try notParser 
-  <|> try falseParser 
-  <|> trueParser 
-  <|> try floatParser 
-  <|> try intParser 
-  <|> varParser
+astParser =
+  try printParser
+    <|> try elseParser
+    <|> try ifParser
+    <|> try whileParser
+    <|> try unwrapParser
+    <|> try astAssignParser
+    <|> try compParser
+    <|> try addParser
+    <|> try mulParser
+    <|> try charParser
+    <|> try stringParser
+    <|> try notParser
+    <|> try falseParser
+    <|> trueParser
+    <|> try floatParser
+    <|> try intParser
+    <|> varParser
 
 astTestParser :: Parser KittyAST
 astTestParser = try elseParser <|> try ifParser <|> try whileParser <|> try astAssignParser <|> try compParser <|> try boolopParser <|> try charParser <|> try stringParser <|> try notParser <|> try falseParser <|> trueParser <|> try floatParser <|> try intParser <|> varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser :: Parser KittyAST
-astSubParser = try addParser  <|>    try elseParser 
-  <|> try ifParser<|> try mulParser <|> try parensParser <|> try compParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+astSubParser =
+  try addParser <|> try elseParser
+    <|> try ifParser
+    <|> try mulParser
+    <|> try parensParser
+    <|> try compParser
+    <|> try charParser
+    <|> try stringParser
+    <|> try floatParser
+    <|> try intParser
+    <|> try trueParser
+    <|> try falseParser
+    <|> varParser
 
 astSubParser'' :: Parser KittyAST
-astSubParser'' = try printParser 
-  <|>    try elseParser 
-  <|> try ifParser
-  <|>try astAssignParser 
-  <|> try addParser 
-  <|> try mulParser 
-  <|> try parensParser 
-  <|> try charParser 
-  <|> try stringParser 
-  <|> try floatParser 
-  <|> try intParser 
-  <|> try trueParser 
-  <|> try falseParser 
-  <|> try varParser
+astSubParser'' =
+  try printParser
+    <|> try elseParser
+    <|> try ifParser
+    <|> try astAssignParser
+    <|> try addParser
+    <|> try mulParser
+    <|> try parensParser
+    <|> try charParser
+    <|> try stringParser
+    <|> try floatParser
+    <|> try intParser
+    <|> try trueParser
+    <|> try falseParser
+    <|> try varParser
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser' :: Parser KittyAST

@@ -1,18 +1,17 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module KittyTypes (Operator (..), KittyAST (..), Env (..), TypeEnv(..),KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb) where
+module KittyTypes (Operator (..), KittyAST (..), Env (..), TypeEnv (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb) where
 
-import Data.Char (toLower)
-import qualified Data.Map as M
-import Data.List(foldl1')
-import Text.ParserCombinators.ReadP
-import Data.Char (isSpace)
 import Control.Applicative ((<|>))
+import Data.Char (isSpace, toLower)
+import Data.List (foldl1')
+import qualified Data.Map as M
+import Text.ParserCombinators.ReadP
 
 {- This file defines the Types and Values of a kitty programm-}
 
 -- | Kitty Types
-data KType = KBool | KInt | KFloat | KString | KChar | KVoid | OneOf KType KType | KFun ([KType],[KType]) deriving ( Eq)
+data KType = KBool | KInt | KFloat | KString | KChar | KVoid | OneOf KType KType | KFun ([KType], [KType]) deriving (Eq)
 
 instance Show KType where
   show KBool = "truth"
@@ -21,56 +20,58 @@ instance Show KType where
   show KString = "text"
   show KVoid = "empty"
   show KChar = "letter"
-  show (KFun (args, returns))= foldl1' (++ ) (map show args) ++ "->"++ foldl1' ( ++) (map show returns)
-  show (OneOf i e )= "one of " ++ show i ++ " or "++ show e
+  show (KFun (args, returns)) = foldl1' (++) (map show args) ++ "->" ++ foldl1' (++) (map show returns)
+  show (OneOf i e) = "one of " ++ show i ++ " or " ++ show e
+
 instance Read KType where
-    readsPrec _ = readP_to_S parseKType
+  readsPrec _ = readP_to_S parseKType
 
 parseKType :: ReadP KType
-parseKType = parseKBool
-         <|> parseKInt
-         <|> parseKFloat
-         <|> parseKString
-         <|> parseKChar
-         <|> parseKVoid
-         -- <|> parseKFun
-         <|> parseOneOf
+parseKType =
+  parseKBool
+    <|> parseKInt
+    <|> parseKFloat
+    <|> parseKString
+    <|> parseKChar
+    <|> parseKVoid
+    -- <|> parseKFun
+    <|> parseOneOf
 
 parseKBool :: ReadP KType
 parseKBool = do
-    skipSpaces
-    _ <- string "truth"
-    return KBool
+  skipSpaces
+  _ <- string "truth"
+  return KBool
 
 parseKInt :: ReadP KType
 parseKInt = do
-    skipSpaces
-    _ <- string "wholeNumber"
-    return KInt
+  skipSpaces
+  _ <- string "wholeNumber"
+  return KInt
 
 parseKFloat :: ReadP KType
 parseKFloat = do
-    skipSpaces
-    _ <- string "decimalNumber"
-    return KFloat
+  skipSpaces
+  _ <- string "decimalNumber"
+  return KFloat
 
 parseKString :: ReadP KType
 parseKString = do
-    skipSpaces
-    _ <- string "text"
-    return KString
+  skipSpaces
+  _ <- string "text"
+  return KString
 
 parseKChar :: ReadP KType
 parseKChar = do
-    skipSpaces
-    _ <- string "letter"
-    return KChar
+  skipSpaces
+  _ <- string "letter"
+  return KChar
 
 parseKVoid :: ReadP KType
 parseKVoid = do
-    skipSpaces
-    _ <- string "empty"
-    return KVoid
+  skipSpaces
+  _ <- string "empty"
+  return KVoid
 
 -- parseKFun :: ReadP KType
 -- parseKFun = do
@@ -81,14 +82,14 @@ parseKVoid = do
 
 parseOneOf :: ReadP KType
 parseOneOf = do
-    _ <- string "one of"
-    skipSpaces
-    i <- parseKType
-    skipSpaces
-    _ <- string "or"
-    skipSpaces
-    e <- parseKType
-    return $ OneOf i e
+  _ <- string "one of"
+  skipSpaces
+  i <- parseKType
+  skipSpaces
+  _ <- string "or"
+  skipSpaces
+  e <- parseKType
+  return $ OneOf i e
 
 -- | Arithmetic operators
 data Operator
@@ -130,8 +131,8 @@ data KittyAST
   | LessEq KittyAST KittyAST
   | GreaterEq KittyAST KittyAST
   | If KittyAST [KittyAST]
-  | IfElse KittyAST [KittyAST][KittyAST]
-  | UnwrapAs KittyAST KType String [KittyAST] -- for unwrapping OneOfs 
+  | IfElse KittyAST [KittyAST] [KittyAST]
+  | UnwrapAs KittyAST KType String [KittyAST] -- for unwrapping OneOfs
   | While KittyAST [KittyAST]
   | Print KittyAST
   deriving (Show, Eq)
@@ -164,10 +165,15 @@ instance Show KittyError where
   show (UndefinedError msg) = "Undefined Error: " ++ msg
 
 type Defs = M.Map String KittyAST
+
 type FType = M.Map String KType -- should always be KFun
+
 type VType = M.Map String KType
+
 data Env = Env {_definitions :: Defs, _variables :: Defs, _tmpResult :: KittyAST} deriving (Show)
-data TypeEnv = TypeEnv {_functionTypes :: FType, _varTypes :: VType}  deriving (Show, Read, Eq)
+
+data TypeEnv = TypeEnv {_functionTypes :: FType, _varTypes :: VType} deriving (Show, Read, Eq)
+
 class ArithOperations a where
   add :: a -> a -> a
   sub :: a -> a -> a
@@ -211,9 +217,10 @@ instance ProgramOutput KittyAST where
   toOutput (Xor e1 e2) = toOutput e1 ++ " xor " ++ toOutput e2
   toOutput (Not e) = "not " ++ toOutput e
   toOutput (Letter c) = show c
-  toOutput (If condition ifblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) 
-  toOutput (IfElse condition ifblock elseblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) ifblock) ++ "\nelse\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) elseblock) 
-  toOutput (While condition loopBody) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" .toOutput) loopBody) 
+  toOutput (If condition ifblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) ifblock)
+  toOutput (IfElse condition ifblock elseblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) ifblock) ++ "\nelse\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) elseblock)
+  toOutput (While condition loopBody) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) loopBody)
+
 -- | convert operator to the char representing it
 -- | used for printing an operator
 opSymb :: Operator -> Char

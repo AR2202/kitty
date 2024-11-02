@@ -1,19 +1,18 @@
 {-# LANGUAGE InstanceSigs #-}
+
 module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv, checkBlockType) where
 
 import Control.Exception (TypeError)
+import Control.Exception.Base (typeError)
 import Control.Monad (foldM, void)
 import Data.Bits (Bits (xor))
 import Data.Functor.Contravariant (Comparison)
 import qualified Data.Map as M
 import qualified Data.Text as T
-
 import Foreign.C (eNODEV)
 import KittyTypes
 import KittyTypes (KittyAST, KittyError)
 import Parser
-import Control.Exception.Base (typeError)
-
 
 {-This is the type checker of the kitty language-}
 
@@ -96,16 +95,16 @@ instance TypeCheckable KittyAST where
     | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for if must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
     | null ifblock = Right KVoid
     | otherwise = case foldM updateTypeEnv' env ifblock of
-        Left err -> Left err
-        Right env -> typeOf (last ifblock) env -- type of the last expression
-        -- still undecided if this is the desired behaviour
+      Left err -> Left err
+      Right env -> typeOf (last ifblock) env -- type of the last expression
+      -- still undecided if this is the desired behaviour
   typeOf (IfElse condition ifblock elseblock) env
     | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for if must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
     | otherwise = case ifTypeOrErr of
+      Left err -> Left err
+      Right typeIf -> case elseTypeOrErr of
         Left err -> Left err
-        Right typeIf -> case elseTypeOrErr of
-          Left err -> Left err
-          Right typeElse -> Right $ OneOf typeIf typeElse
+        Right typeElse -> Right $ OneOf typeIf typeElse
     where
       ifTypeOrErr = checkIfType ifblock
       elseTypeOrErr = checkIfType elseblock
@@ -114,23 +113,27 @@ instance TypeCheckable KittyAST where
         Left err -> Left err
         Right env' -> typeOf (last statements) env'
   typeOf (UnwrapAs vname typename unwrappedName doBlock) env =
-    case typeOf vname env of 
-      Right (OneOf x y) -> if (typename == x) || (typename == y) then checkBlockType doBlock (env{_varTypes = M.insert unwrappedName typename (_varTypes env)})
-      else Left $TypeError ("One of " ++ show x ++ " and "++ show y ++" can't be unwrapped to " ++ show typename)
-      _ ->Left $ TypeError $"trying to unwrap a value of type "++showUnwrapped (typeOf vname env)++"; only One of type can be unwrapped"
+    case typeOf vname env of
+      Right (OneOf x y) ->
+        if (typename == x) || (typename == y)
+          then checkBlockType doBlock (env {_varTypes = M.insert unwrappedName typename (_varTypes env)})
+          else Left $ TypeError ("One of " ++ show x ++ " and " ++ show y ++ " can't be unwrapped to " ++ show typename)
+      _ -> Left $ TypeError $ "trying to unwrap a value of type " ++ showUnwrapped (typeOf vname env) ++ "; only One of type can be unwrapped"
   typeOf (While condition whileblock) env
     | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for while loop must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
     | null whileblock = Right KVoid
     | otherwise = case foldM updateTypeEnv' env whileblock of
-        Left err -> Left err
-        Right env -> typeOf (last whileblock) env -- type of the last expression
-        -- still undecided if this is the desired behaviour
-  typeOf (Print _) _= Right KVoid
+      Left err -> Left err
+      Right env -> typeOf (last whileblock) env -- type of the last expression
+      -- still undecided if this is the desired behaviour
+  typeOf (Print _) _ = Right KVoid
+
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
 checkBlockType statements env = case foldM updateTypeEnv' env statements of
-        Left err -> Left err
-        Right env' -> typeOf (last statements) env'
+  Left err -> Left err
+  Right env' -> typeOf (last statements) env'
+
 instance TypeCheckable FunctionCall where
   typeOf :: FunctionCall -> TypeEnv -> Either KittyError KType
   typeOf (FunctionCall fnName fnParams) env = case M.lookup fnName (_functionTypes env) of
@@ -159,7 +162,7 @@ typeCheckOutput env text = case typeCheck env text of
   Right x -> show x
   Left x -> show x
 
--- | handles different cases of the AST types to update type environment, and return type 
+-- | handles different cases of the AST types to update type environment, and return type
 -- | updates Type environment only if a definition or if/else block is encountered
 -- | otherwise, keeps the type enviornment unchanged
 -- | also returns the type of the expression for type checking
@@ -170,7 +173,7 @@ updateTypeEnv tenv text = case parseAsAST text of
     Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)}, t)
     Left err -> Left err
   Right (If c e) -> case typeCheck tenv text of
-    Right t -> makeEitherTuple  (unifyMaybeTypeEnvs (updateManyTypeEnv tenv e) ( Right tenv)) t
+    Right t -> makeEitherTuple (unifyMaybeTypeEnvs (updateManyTypeEnv tenv e) (Right tenv)) t
     Left err -> Left err
   Right (IfElse c i e) -> case typeCheck tenv text of
     Right t -> makeEitherTuple (unifyMaybeTypeEnvs (updateManyTypeEnv tenv i) (updateManyTypeEnv tenv e)) t

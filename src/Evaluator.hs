@@ -1,12 +1,24 @@
-module Evaluator (parseEvalAndPrintResult, parseEvalPrintMultiline, parseRepl, evalMultiple, initialEnv, parseEvalFile) where
+module Evaluator
+  ( parseEvalAndPrintResult,
+    parseEvalPrintMultiline,
+    parseRepl,
+    evalT,
+    evalMultiple,
+    initialEnv,
+    parseEvalFile,
+  )
+where
 
+import Control.Monad.Except (ExceptT (..), catchError, runExceptT, throwError)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
 import Data.Foldable (foldl1)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import KittyTypes
 import Parser
 import Text.Parsec.Error
-import TypeChecker(typeOf, initialTypeEnv, updateTypeEnv, checkBlockType)
+import TypeChecker (checkBlockType, initialTypeEnv, typeOf, updateTypeEnv)
 
 {-This is the definition of the evaluation
 a tree-walk interpreter to traverse and execute the AST-}
@@ -15,23 +27,29 @@ a tree-walk interpreter to traverse and execute the AST-}
 initialEnv :: Env
 initialEnv = Env M.empty M.empty None
 
+-- | the evaluation using Monad Transformer
+evalT :: Env -> KittyAST -> ExceptT KittyError IO Env
+evalT env val = ExceptT $ return $ eval env val
+
 -- | the evaluation function
 eval :: Env -> KittyAST -> Either KittyError Env
-eval env (DefType (AssignDef varname vardef)) = case evalExpression env vardef of 
-  Left err -> Left err 
+eval env (DefType (AssignDef varname vardef)) = case evalExpression env vardef of
+  Left err -> Left err
   Right def -> Right $ env {_variables = M.insert varname def (_variables env)}
 eval env (If b e) = case evalExpression env b of
   Right (BoolLit False) -> Right env
   Right (BoolLit True) -> evalMultiple env e
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
-eval env (UnwrapAs vname typename unwrappedName doBlock) = case evalExpression env  vname  of
---the value bound to the variable vname has to be retrieved and type-checked 
+eval env (UnwrapAs vname typename unwrappedName doBlock) = case evalExpression env vname of
+  --the value bound to the variable vname has to be retrieved and type-checked
   Left err -> Left err
   Right x -> case typeOf x initialTypeEnv of
-     Left err -> Left err
-     Right tname -> if tname == typename then evalMultiple (env{_variables = M.insert unwrappedName x (_variables env)}) doBlock else Right env
-
+    Left err -> Left err
+    Right tname ->
+      if tname == typename
+        then evalMultiple (env {_variables = M.insert unwrappedName x (_variables env)}) doBlock
+        else Right env
 eval env (IfElse b i e) = case evalExpression env b of
   Right (BoolLit False) -> evalMultiple env e
   Right (BoolLit True) -> evalMultiple env i
@@ -39,7 +57,7 @@ eval env (IfElse b i e) = case evalExpression env b of
   _ -> Left $ TypeError "Condition must have type truth"
 eval env (While c e) = case evalExpression env c of
   Right (BoolLit False) -> Right env
-  Right (BoolLit True) -> evalMultiple env e >>=  flip eval (While c e)
+  Right (BoolLit True) -> evalMultiple env e >>= flip eval (While c e)
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
 eval env e = case evalExpression env e of
@@ -52,8 +70,22 @@ evalExpression _ (IntLit i) = Right $ IntLit i
 evalExpression _ (Expr op (IntLit i) (IntLit j)) = Right $ IntLit $ evalOp op i j
 evalExpression _ (FloatLit i) = Right $ FloatLit i
 evalExpression _ (Expr op (FloatLit i) (FloatLit j)) = Right $ FloatLit $ evalOp op i j
-evalExpression _ (Expr op (IntLit i) (FloatLit j)) = Left $ TypeError $ show i ++ " has type integer, which can't be combined with the operator " ++ show j ++ ", a value of type float with " ++ return (opSymb op)
-evalExpression _ (Expr op (FloatLit i) (IntLit j)) = Left $ TypeError $ show i ++ " has type float, which can't be combined with " ++ show j ++ ", a value of type integer, with the operator " ++ return (opSymb op) -- type names might change
+evalExpression _ (Expr op (IntLit i) (FloatLit j)) =
+  Left $
+    TypeError $
+      show i
+        ++ " has type integer, which can't be combined with the operator "
+        ++ show j
+        ++ ", a value of type float with "
+        ++ return (opSymb op)
+evalExpression _ (Expr op (FloatLit i) (IntLit j)) =
+  Left $
+    TypeError $
+      show i
+        ++ " has type float, which can't be combined with "
+        ++ show j
+        ++ ", a value of type integer, with the operator "
+        ++ return (opSymb op) -- type names might change
 evalExpression env (Expr op e1 e2) = case evalExpression env e1 of
   Left err -> Left err
   Right exp1 -> case evalExpression env e2 of
@@ -63,16 +95,26 @@ evalExpression env (Parens e) = evalExpression env e
 evalExpression env (Variable v) = evalVariable v env >>= evalExpression env
 evalExpression env (BoolLit tf) = Right $ BoolLit tf
 evalExpression env (And b1 b2)
-  | evalExpression env b1 == Right (BoolLit True) && evalExpression env b2 == Right (BoolLit True) = Right $ BoolLit True
+  | evalExpression env b1 == Right (BoolLit True)
+      && evalExpression env b2 == Right (BoolLit True) =
+    Right $ BoolLit True
   | otherwise = Right $ BoolLit False
 evalExpression env (Or b1 b2)
-  | evalExpression env b1 == Right (BoolLit True) || evalExpression env b2 == Right (BoolLit True) = Right $ BoolLit True
+  | evalExpression env b1 == Right (BoolLit True)
+      || evalExpression env b2 == Right (BoolLit True) =
+    Right $ BoolLit True
   | otherwise = Right $ BoolLit False
 evalExpression env (Xor b1 b2)
-  | evalExpression env b1 == Right (BoolLit True) || evalExpression env b2 == Right (BoolLit False) = Right $ BoolLit True
-  | evalExpression env b1 == Right (BoolLit False) || evalExpression env b2 == Right (BoolLit False) = Right $ BoolLit True
+  | evalExpression env b1 == Right (BoolLit True)
+      || evalExpression env b2 == Right (BoolLit False) =
+    Right $ BoolLit True
+  | evalExpression env b1 == Right (BoolLit False)
+      || evalExpression env b2 == Right (BoolLit False) =
+    Right $ BoolLit True
   | otherwise = Right $ BoolLit False
-evalExpression env (Variable v) = evalVariable v env >>= evalExpression env
+evalExpression env (Variable v) =
+  evalVariable v env
+    >>= evalExpression env
 evalExpression env (Not (BoolLit True)) = Right $ BoolLit False
 evalExpression env (Not (BoolLit False)) = Right $ BoolLit True
 evalExpression env (Not b) = evalExpression env b >>= \x -> evalExpression env (Not x)
@@ -130,7 +172,6 @@ evalVariable v env = case M.lookup v (_variables env) of
 evalAndPrintEnv :: Env -> KittyAST -> String
 evalAndPrintEnv e a = show (eval e a)
 
-
 evalAndPrintResult :: Env -> KittyAST -> Either KittyError String
 evalAndPrintResult e a = toOutput . _tmpResult <$> eval e a
 
@@ -148,18 +189,21 @@ parseEvalAndPrintResult text = case evalAndPrintResult initialEnv <$> parseAsAST
   Right (Right x) -> putStrLn x
   Right (Left err) -> print err
   Left err -> print err
+evalMultipleT :: Foldable t => Env -> t KittyAST -> ExceptT KittyError IO Env
+evalMultipleT env = foldl (\env' e -> env' >>= (flip evalT) e) (ExceptT( return (Right env)))
 
 evalMultiple :: Foldable t => Env -> t KittyAST -> Either KittyError Env
-evalMultiple env astlist = foldl (\env' e -> env' >>= (flip eval) e) (Right env) astlist
+evalMultiple env = foldl (\env' e -> env' >>= (flip eval) e) (Right env)
 
 evalMultipleExpr :: Foldable t => Env -> t KittyAST -> Either KittyError KittyAST
-evalMultipleExpr env astlist = case evalMultiple env astlist of 
-  Left err -> Left err 
+evalMultipleExpr env astlist = case evalMultiple env astlist of
+  Left err -> Left err
   Right env' -> Right $ _tmpResult env'
+
 parseEvalMultiline :: T.Text -> Either KittyError Env
-parseEvalMultiline text = case traverse parseAsAST $ filter (not . T.null) $T.lines text of
-  Right asts -> case checkBlockType asts initialTypeEnv of 
-    Left err -> Left err 
+parseEvalMultiline text = case traverse parseAsAST $ filter (not . T.null) $ T.lines text of
+  Right asts -> case checkBlockType asts initialTypeEnv of
+    Left err -> Left err
     _ -> evalMultiple initialEnv asts
   Left _ -> Left $ KittyTypes.ParseError (T.unpack text)
 
@@ -172,9 +216,10 @@ parseRepl :: Env -> T.Text -> Either KittyError Env
 parseRepl env text = case traverse parseAsAST $ T.lines text of
   Right asts -> evalMultiple env asts
   Left _ -> Left $ KittyTypes.ParseError (T.unpack text)
+
 -- | parses and executes code from a file
 -- | currently throws an error if filepath doesn't exit -fix
-parseEvalFile :: String -> IO()
-parseEvalFile filepath = do 
-  contents <- readFile filepath 
+parseEvalFile :: String -> IO ()
+parseEvalFile filepath = do
+  contents <- readFile filepath
   parseEvalPrintMultiline $ T.pack contents
