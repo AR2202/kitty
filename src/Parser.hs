@@ -129,21 +129,31 @@ parensParser =
 stringParser :: Parser KittyAST
 stringParser =
   StrLit
-    <$> between (spaces *> char '"') (char '"' <* spaces) (many (noneOf "\"\'"))
+    <$> between
+      (spaces *> char '"')
+      (char '"' <* spaces)
+      (many (noneOf "\"\'"))
 
 -- | parsing chars
 charParser :: Parser KittyAST
 charParser =
   Letter
-    <$> between (spaces *> char '\'') (char '\'' <* spaces) anyChar
+    <$> between
+      (spaces *> char '\'')
+      (char '\'' <* spaces)
+      anyChar
 
 {-Parsing Bool-}
 
 trueParser :: Parser KittyAST
-trueParser = BoolLit True <$ (spaces *> string "true" >> notFollowedBy alphaNum <* spaces)
+trueParser =
+  BoolLit True
+    <$ (spaces *> string "true" >> notFollowedBy alphaNum <* spaces)
 
 falseParser :: Parser KittyAST
-falseParser = BoolLit False <$ (spaces *> string "false" >> notFollowedBy alphaNum <* spaces)
+falseParser =
+  BoolLit False
+    <$ (spaces *> string "false" >> notFollowedBy alphaNum <* spaces)
 
 notParser :: Parser KittyAST
 notParser =
@@ -319,7 +329,9 @@ whileCondParser =
 ifBlockParser =
   between
     (spaces *> string "then" <* spaces)
-    (spaces *> (try (string "endif")) <|> (lookAhead (string "else")) <* spaces)
+    ( spaces *> (try (string "endif"))
+        <|> (lookAhead (string "else")) <* spaces
+    )
     (many astSubParser'')
 
 elseBlockParser =
@@ -387,7 +399,18 @@ varParser = do
   guard (varname `notElem` keywords)
   return $ Variable varname
   where
-    keywords = ["if", "else", "endif", "then", "endunwrap", "andDo", "do", "while", "endwhile", "print"]
+    keywords =
+      [ "if",
+        "else",
+        "endif",
+        "then",
+        "endunwrap",
+        "andDo",
+        "do",
+        "while",
+        "endwhile",
+        "print"
+      ]
 
 printParser :: Parser KittyAST
 printParser =
@@ -470,7 +493,17 @@ astSubParser'' =
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser' :: Parser KittyAST
-astSubParser' = try addParser <|> try mulParser <|> try parensParser <|> try charParser <|> try stringParser <|> try floatParser <|> try intParser <|> try trueParser <|> try falseParser <|> varParser
+astSubParser' =
+  try addParser
+    <|> try mulParser
+    <|> try parensParser
+    <|> try charParser
+    <|> try stringParser
+    <|> try floatParser
+    <|> try intParser
+    <|> try trueParser
+    <|> try falseParser
+    <|> varParser
 
 {- helper function to test parsing in the console-}
 

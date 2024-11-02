@@ -8,9 +8,9 @@ import qualified Data.Text as T
 import Evaluator
 import KittyTypes
 import Parser
+import System.IO (hFlush, stdout)
 import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 import TypeChecker
-import System.IO (hFlush, stdout)
 
 -- | the entry point of the Kitty REPL
 repl :: IO ()
@@ -28,7 +28,7 @@ repl = do
 -- | the actual REPL
 repl' :: Env -> TypeEnv -> IO ()
 repl' env tenv = do
-  putStr "kitty>:X)" 
+  putStr "kitty>:X)"
   hFlush stdout
   input <- getLine
 
@@ -42,23 +42,35 @@ repl' env tenv = do
       -- only type-checks the expression and prints
       -- it's type, but doesn't evaluate it
       if "type " `isPrefixOf` input
-        then putStrLn (typeCheckOutput tenv (T.pack (drop 5 input))) >> repl' env tenv
-        else
-          -- if input starts with the evalFile keyword, 
-            --evaluates the file on the path prvided
-        if "evalFile "`isPrefixOf` input
-          then parseEvalFile  (drop 9 input) >> repl' env tenv
-          else
-           -- type checking first, but printing result of type checking
-        -- only if type error
-        -- otherwise, continue with evaluation
+        then
+          putStrLn (typeCheckOutput tenv (T.pack (drop 5 input)))
+            >> repl' env tenv
+        else -- if input starts with the evalFile keyword,
+        --evaluates the file on the path prvided
+
+          if "evalFile " `isPrefixOf` input
+            then parseEvalFile (drop 9 input) >> repl' env tenv
+            else -- type checking first, but printing result of type checking
+            -- only if type error
+            -- otherwise, continue with evaluation
 
             case updateTypeEnv tenv (T.pack input) of
               Left err -> print err >> repl' env tenv
-              Right (newtenv,t) -> case parseRepl env (T.pack input) of
+              Right (newtenv, t) -> case parseRepl env (T.pack input) of
                 Left err -> print err >> repl' env tenv
-                Right newenv -> putStrLn ((toOutput . _tmpResult) newenv) >> repl' newenv newtenv
+                Right newenv ->
+                  putStrLn ((toOutput . _tmpResult) newenv)
+                    >> repl' newenv newtenv
 
--- | reads a file from FilePath if path exists and returns content, otherwise returns an error message string
+-- | reads a file from FilePath if path exists and returns content,
+-- | otherwise returns an error message string
 readFileIfExists :: FilePath -> IO String
-readFileIfExists file = catchJust (\e -> if isDoesNotExistErrorType (ioeGetErrorType e) then Just () else Nothing) (readFile file) (\_ -> return (file ++ " not found"))
+readFileIfExists file =
+  catchJust
+    ( \e ->
+        if isDoesNotExistErrorType (ioeGetErrorType e)
+          then Just ()
+          else Nothing
+    )
+    (readFile file)
+    (\_ -> return (file ++ " not found"))

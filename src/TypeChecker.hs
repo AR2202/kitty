@@ -41,65 +41,183 @@ instance TypeCheckable KittyAST where
   typeOf (Expr o e e2) env
     | typeOf e env == typeOf e2 env && typeOf e env /= Right KInt && typeOf e env /= Right KFloat = Left $ TypeError ("wrong type: expected number; value of type " ++ showUnwrapped (typeOf e env) ++ " can't be combined used with Operator " ++ (show . opSymb) o)
     | typeOf e env == typeOf e2 env = typeOf e env
-    | otherwise = Left $ TypeError ("type mismatch: value of type " ++ showUnwrapped (typeOf e env) ++ " can't be combined with a value of type " ++ showUnwrapped (typeOf e2 env) ++ " with Operator " ++ (show . opSymb) o)
+    | otherwise =
+      Left $
+        TypeError
+          ( "type mismatch: value of type "
+              ++ showUnwrapped (typeOf e env)
+              ++ " can't be combined with a value of type "
+              ++ showUnwrapped (typeOf e2 env)
+              ++ " with Operator "
+              ++ (show . opSymb) o
+          )
   typeOf (Parens e) env = typeOf e env
   -- instance TypeCheckable BoolExpr where
   typeOf (BoolLit _) _ = Right KBool
   typeOf (And e1 e2) env
-    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool = Left $ TypeError ("wrong type: expected truth, but got " ++ showUnwrapped (typeOf e1 env) ++ "; and can only be used with values of type truth")
-    | typeOf e1 env == typeOf e2 env = typeOf e1 env
-    | otherwise = Left $ TypeError ("type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be combined with a value of type " ++ showUnwrapped (typeOf e2 env) ++ " with and ")
+    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool =
+      Left $
+        TypeError
+          ( "wrong type: expected truth, but got "
+              ++ showUnwrapped (typeOf e1 env)
+              ++ "; and can only be used with values of type truth"
+          )
+    | typeOf e1 env == typeOf e2 env =
+      typeOf e1 env
+    | otherwise =
+      Left $
+        TypeError
+          ( "type mismatch: value of type "
+              ++ showUnwrapped (typeOf e1 env)
+              ++ " can't be combined with a value of type "
+              ++ showUnwrapped (typeOf e2 env)
+              ++ " with and "
+          )
   typeOf (Or e1 e2) env
-    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool = Left $ TypeError ("wrong type: expected truth, but got " ++ showUnwrapped (typeOf e1 env) ++ "; or can only be used with values of type truth")
-    | typeOf e1 env == typeOf e2 env = typeOf e1 env
-    | otherwise = Left $ TypeError ("type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be combined with a value of type " ++ showUnwrapped (typeOf e2 env) ++ " with or ")
+    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool =
+      Left $
+        TypeError
+          ( "wrong type: expected truth, but got "
+              ++ showUnwrapped (typeOf e1 env)
+              ++ "; or can only be used with values of type truth"
+          )
+    | typeOf e1 env == typeOf e2 env =
+      typeOf e1 env
+    | otherwise =
+      Left $
+        TypeError
+          ( "type mismatch: value of type "
+              ++ showUnwrapped (typeOf e1 env)
+              ++ " can't be combined with a value of type "
+              ++ showUnwrapped (typeOf e2 env)
+              ++ " with or "
+          )
   typeOf (Xor e1 e2) env
-    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool = Left $ TypeError ("wrong type: expected truth, but got " ++ showUnwrapped (typeOf e1 env) ++ " xor can only be used with values of type truth")
-    | typeOf e1 env == typeOf e2 env = typeOf e1 env
-    | otherwise = Left $ TypeError ("type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be combined with a value of type " ++ showUnwrapped (typeOf e2 env) ++ " with xor ")
-  typeOf (Not b) env = case typeOf b env of
-    Right KBool -> Right KBool
-    _ -> Left $ TypeError ("wrong type: expected truth, but got " ++ showUnwrapped (typeOf b env) ++ "; not requires a value of type " ++ show KBool ++ " but has been given Type " ++ showUnwrapped (typeOf b env))
+    | typeOf e1 env == typeOf e2 env && typeOf e1 env /= Right KBool =
+      Left $
+        TypeError
+          ( "wrong type: expected truth, but got "
+              ++ showUnwrapped (typeOf e1 env)
+              ++ " xor can only be used with values of type truth"
+          )
+    | typeOf e1 env == typeOf e2 env =
+      typeOf e1 env
+    | otherwise =
+      Left $
+        TypeError
+          ( "type mismatch: value of type "
+              ++ showUnwrapped (typeOf e1 env)
+              ++ " can't be combined with a value of type "
+              ++ showUnwrapped (typeOf e2 env)
+              ++ " with xor "
+          )
+  typeOf (Not b) env =
+    case typeOf b env of
+      Right KBool -> Right KBool
+      _ -> Left $ TypeError ("wrong type: expected truth, but got " ++ showUnwrapped (typeOf b env) ++ "; not requires a value of type " ++ show KBool ++ " but has been given Type " ++ showUnwrapped (typeOf b env))
   -- instance TypeCheckable CompOp where
   typeOf (Equal e1 e2) env
     | typeOf e1 env == typeOf e2 env = Right KBool
-    | otherwise = Left $ TypeError $ "type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be compared with value of type " ++ showUnwrapped (typeOf e2 env)
+    | otherwise =
+      Left $
+        TypeError $
+          "type mismatch: value of type "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be compared with value of type "
+            ++ showUnwrapped (typeOf e2 env)
   typeOf (NotEqual e1 e2) env
     | typeOf e1 env == typeOf e2 env = Right KBool
-    | otherwise = Left $ TypeError $ "type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be compared with value of type " ++ showUnwrapped (typeOf e2 env)
+    | otherwise =
+      Left $
+        TypeError $
+          "type mismatch: value of type "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be compared with value of type "
+            ++ showUnwrapped (typeOf e2 env)
   typeOf (Less e1 e2) env
-    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be compared with value of type " ++ showUnwrapped (typeOf e2 env)
+    | typeOf e1 env /= typeOf e2 env =
+      Left $
+        TypeError $
+          "type mismatch: value of type "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be compared with value of type "
+            ++ showUnwrapped (typeOf e2 env)
     | typeOf e1 env == Right KInt = Right KBool
     | typeOf e1 env == Right KFloat = Right KBool
     | typeOf e1 env == Right KString = Right KBool
-    | otherwise = Left $ TypeError $ "type  " ++ showUnwrapped (typeOf e1 env) ++ " can't be ordered, so < can't be used on this type"
+    | otherwise =
+      Left $
+        TypeError $
+          "type  "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be ordered, so < can't be used on this type"
   typeOf (Greater e1 e2) env
-    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be compared"
+    | typeOf e1 env /= typeOf e2 env =
+      Left $
+        TypeError $
+          "type mismatch: value of type "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be compared"
     | typeOf e1 env == Right KInt = Right KBool
     | typeOf e1 env == Right KFloat = Right KBool
     | typeOf e1 env == Right KString = Right KBool
-    | otherwise = Left $ TypeError $ "type  " ++ showUnwrapped (typeOf e1 env) ++ " can't be ordered, so > can't be used on this type"
+    | otherwise =
+      Left $
+        TypeError $
+          "type  "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be ordered, so > can't be used on this type"
   typeOf (LessEq e1 e2) env
-    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be compared"
+    | typeOf e1 env /= typeOf e2 env =
+      Left $
+        TypeError $
+          "type mismatch: value of type "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be compared"
     | typeOf e1 env == Right KInt = Right KBool
     | typeOf e1 env == Right KFloat = Right KBool
     | typeOf e1 env == Right KString = Right KBool
-    | otherwise = Left $ TypeError $ "type  " ++ showUnwrapped (typeOf e1 env) ++ " can't be ordered, so <= can't be used on this type"
+    | otherwise =
+      Left $
+        TypeError $
+          "type  "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be ordered, so <= can't be used on this type"
   typeOf (GreaterEq e1 e2) env
-    | typeOf e1 env /= typeOf e2 env = Left $ TypeError $ "type mismatch: value of type " ++ showUnwrapped (typeOf e1 env) ++ " can't be compared"
+    | typeOf e1 env /= typeOf e2 env =
+      Left $
+        TypeError $
+          "type mismatch: value of type "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be compared"
     | typeOf e1 env == Right KInt = Right KBool
     | typeOf e1 env == Right KFloat = Right KBool
     | typeOf e1 env == Right KString = Right KBool
-    | otherwise = Left $ TypeError $ "type  " ++ showUnwrapped (typeOf e1 env) ++ " can't be ordered, so >= can't be used on this type"
+    | otherwise =
+      Left $
+        TypeError $
+          "type  "
+            ++ showUnwrapped (typeOf e1 env)
+            ++ " can't be ordered, so >= can't be used on this type"
   typeOf (If condition ifblock) env
-    | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for if must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
+    | typeOf condition env /= Right KBool =
+      Left $
+        TypeError $
+          "condition for if must be a value of type truth, but a value of type "
+            ++ showUnwrapped (typeOf condition env)
+            ++ " was provided"
     | null ifblock = Right KVoid
     | otherwise = case foldM updateTypeEnv' env ifblock of
       Left err -> Left err
       Right env -> typeOf (last ifblock) env -- type of the last expression
       -- still undecided if this is the desired behaviour
   typeOf (IfElse condition ifblock elseblock) env
-    | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for if must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
+    | typeOf condition env /= Right KBool =
+      Left $
+        TypeError $
+          "condition for if must be a value of type truth, but a value of type "
+            ++ showUnwrapped (typeOf condition env)
+            ++ " was provided"
     | otherwise = case ifTypeOrErr of
       Left err -> Left err
       Right typeIf -> case elseTypeOrErr of
@@ -109,18 +227,42 @@ instance TypeCheckable KittyAST where
       ifTypeOrErr = checkIfType ifblock
       elseTypeOrErr = checkIfType elseblock
       checkIfType [] = Right KVoid
-      checkIfType statements = case foldM updateTypeEnv' env statements of
-        Left err -> Left err
-        Right env' -> typeOf (last statements) env'
+      checkIfType statements =
+        case foldM updateTypeEnv' env statements of
+          Left err -> Left err
+          Right env' -> typeOf (last statements) env'
   typeOf (UnwrapAs vname typename unwrappedName doBlock) env =
     case typeOf vname env of
       Right (OneOf x y) ->
         if (typename == x) || (typename == y)
-          then checkBlockType doBlock (env {_varTypes = M.insert unwrappedName typename (_varTypes env)})
-          else Left $ TypeError ("One of " ++ show x ++ " and " ++ show y ++ " can't be unwrapped to " ++ show typename)
-      _ -> Left $ TypeError $ "trying to unwrap a value of type " ++ showUnwrapped (typeOf vname env) ++ "; only One of type can be unwrapped"
+          then
+            checkBlockType
+              doBlock
+              ( env
+                  { _varTypes = M.insert unwrappedName typename (_varTypes env)
+                  }
+              )
+          else
+            Left $
+              TypeError
+                ( "One of "
+                    ++ show x
+                    ++ " and "
+                    ++ show y
+                    ++ " can't be unwrapped to "
+                    ++ show typename
+                )
+      _ ->
+        Left $
+          TypeError $
+            "trying to unwrap a value of type "
+              ++ showUnwrapped (typeOf vname env)
+              ++ "; only One of type can be unwrapped"
   typeOf (While condition whileblock) env
-    | typeOf condition env /= Right KBool = Left $ TypeError $ "condition for while loop must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
+    | typeOf condition env /= Right KBool =
+      Left $
+        TypeError $
+          "condition for while loop must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
     | null whileblock = Right KVoid
     | otherwise = case foldM updateTypeEnv' env whileblock of
       Left err -> Left err
@@ -130,15 +272,17 @@ instance TypeCheckable KittyAST where
 
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
-checkBlockType statements env = case foldM updateTypeEnv' env statements of
-  Left err -> Left err
-  Right env' -> typeOf (last statements) env'
+checkBlockType statements env =
+  case foldM updateTypeEnv' env statements of
+    Left err -> Left err
+    Right env' -> typeOf (last statements) env'
 
 instance TypeCheckable FunctionCall where
   typeOf :: FunctionCall -> TypeEnv -> Either KittyError KType
-  typeOf (FunctionCall fnName fnParams) env = case M.lookup fnName (_functionTypes env) of
-    Nothing -> Left $ UndefinedError ("no function named " ++ fnName)
-    Just _ -> Left $ UndefinedError "not yet implemented"
+  typeOf (FunctionCall fnName fnParams) env =
+    case M.lookup fnName (_functionTypes env) of
+      Nothing -> Left $ UndefinedError ("no function named " ++ fnName)
+      Just _ -> Left $ UndefinedError "not yet implemented"
 
 instance TypeCheckable Definition where
   typeOf (AssignDef varname e) env = typeOf e env
@@ -162,36 +306,63 @@ typeCheckOutput env text = case typeCheck env text of
   Right x -> show x
   Left x -> show x
 
--- | handles different cases of the AST types to update type environment, and return type
--- | updates Type environment only if a definition or if/else block is encountered
+-- | handles different cases of the AST types to update type environment,
+-- | and return type
+-- | updates Type environment only if a definition
+-- | or if/else block is encountered
 -- | otherwise, keeps the type enviornment unchanged
 -- | also returns the type of the expression for type checking
 updateTypeEnv :: TypeEnv -> T.Text -> Either KittyError (TypeEnv, KType)
-updateTypeEnv tenv text = case parseAsAST text of
-  Left _ -> Left $ ParseError (T.unpack text)
-  Right (DefType (AssignDef varname e)) -> case typeCheck tenv text of
-    Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)}, t)
-    Left err -> Left err
-  Right (If c e) -> case typeCheck tenv text of
-    Right t -> makeEitherTuple (unifyMaybeTypeEnvs (updateManyTypeEnv tenv e) (Right tenv)) t
-    Left err -> Left err
-  Right (IfElse c i e) -> case typeCheck tenv text of
-    Right t -> makeEitherTuple (unifyMaybeTypeEnvs (updateManyTypeEnv tenv i) (updateManyTypeEnv tenv e)) t
-    Left err -> Left err
-  Right ast -> (,) tenv <$> typeOf ast tenv
+updateTypeEnv tenv text =
+  case parseAsAST text of
+    Left _ -> Left $ ParseError (T.unpack text)
+    Right (DefType (AssignDef varname e)) ->
+      case typeCheck tenv text of
+        Right t ->
+          Right
+            ( tenv
+                { _varTypes = M.insert varname t (_varTypes tenv)
+                },
+              t
+            )
+        Left err -> Left err
+    Right (If c e) ->
+      case typeCheck tenv text of
+        Right t ->
+          makeEitherTuple
+            (unifyMaybeTypeEnvs (updateManyTypeEnv tenv e) (Right tenv))
+            t
+        Left err -> Left err
+    Right (IfElse c i e) -> case typeCheck tenv text of
+      Right t ->
+        makeEitherTuple
+          ( unifyMaybeTypeEnvs
+              (updateManyTypeEnv tenv i)
+              (updateManyTypeEnv tenv e)
+          )
+          t
+      Left err -> Left err
+    Right ast -> (,) tenv <$> typeOf ast tenv
 
 -- | combines two typeEnvs by combining their variable type lookup tables
 -- | if variable names collide, creates a OneOf of both types if types are different
 unifyTypeEnvs :: TypeEnv -> TypeEnv -> TypeEnv
-unifyTypeEnvs tenv1 tenv2 = tenv1 {_varTypes = M.map (unwrapOneOfIfEqual . oneOfVoidIfMissing) $ M.unionWith OneOf (_varTypes tenv1) (_varTypes tenv2)}
+unifyTypeEnvs tenv1 tenv2 =
+  tenv1
+    { _varTypes =
+        M.map (unwrapOneOfIfEqual . oneOfVoidIfMissing) $
+          M.unionWith OneOf (_varTypes tenv1) (_varTypes tenv2)
+    }
 
 -- | wraps two types in a OneOf if and only if they are different
 oneOfIfDifferent :: KType -> KType -> KType
-oneOfIfDifferent type1 type2 = if type1 == type2 then type1 else OneOf type1 type2
+oneOfIfDifferent type1 type2 =
+  if type1 == type2 then type1 else OneOf type1 type2
 
 -- | unwraps OneOf if the two contained types are equal
 unwrapOneOfIfEqual :: KType -> KType
-unwrapOneOfIfEqual (OneOf type1 type2) = if type1 == type2 then type1 else OneOf type1 type2
+unwrapOneOfIfEqual (OneOf type1 type2) =
+  if type1 == type2 then type1 else OneOf type1 type2
 unwrapOneOfIfEqual x = x
 
 -- | wraps a KType in OneOf, adding KVoid for the second type
@@ -203,7 +374,8 @@ oneOfVoidIfMissing x = OneOf x KVoid
 unifyMaybeTypeEnvs :: Either a TypeEnv -> Either a TypeEnv -> Either a TypeEnv
 unifyMaybeTypeEnvs (Left e) _ = Left e
 unifyMaybeTypeEnvs _ (Left e) = Left e
-unifyMaybeTypeEnvs (Right e1) (Right e2) = Right (unifyTypeEnvs e1 e2)
+unifyMaybeTypeEnvs (Right e1) (Right e2) =
+  Right (unifyTypeEnvs e1 e2)
 
 -- | helper function for making a tuple of two values where the first is an Either a b
 makeEitherTuple :: Monad f => f a1 -> a2 -> f (a1, a2)
@@ -211,7 +383,8 @@ makeEitherTuple eithera b = (,) <$> eithera <*> return b
 
 -- | fold the updateTupeEnv' function over a foldable of KittyAST (e.g. a list)
 updateManyTypeEnv :: Foldable t => TypeEnv -> t KittyAST -> Either KittyError TypeEnv
-updateManyTypeEnv tenv e = foldl (\tenv' e' -> tenv' >>= flip updateTypeEnv' e') (return tenv) e
+updateManyTypeEnv tenv e =
+  foldl (\tenv' e' -> tenv' >>= flip updateTypeEnv' e') (return tenv) e
 
 -- | inserts a variable into the type environment and produces a new type environment or an error
 updateTypeEnv' :: TypeEnv -> KittyAST -> Either KittyError TypeEnv

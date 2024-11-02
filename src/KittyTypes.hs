@@ -11,7 +11,16 @@ import Text.ParserCombinators.ReadP
 {- This file defines the Types and Values of a kitty programm-}
 
 -- | Kitty Types
-data KType = KBool | KInt | KFloat | KString | KChar | KVoid | OneOf KType KType | KFun ([KType], [KType]) deriving (Eq)
+data KType
+  = KBool
+  | KInt
+  | KFloat
+  | KString
+  | KChar
+  | KVoid
+  | OneOf KType KType
+  | KFun ([KType], [KType])
+  deriving (Eq)
 
 instance Show KType where
   show KBool = "truth"
@@ -20,8 +29,10 @@ instance Show KType where
   show KString = "text"
   show KVoid = "empty"
   show KChar = "letter"
-  show (KFun (args, returns)) = foldl1' (++) (map show args) ++ "->" ++ foldl1' (++) (map show returns)
-  show (OneOf i e) = "one of " ++ show i ++ " or " ++ show e
+  show (KFun (args, returns)) =
+    foldl1' (++) (map show args) ++ "->" ++ foldl1' (++) (map show returns)
+  show (OneOf i e) =
+    "one of " ++ show i ++ " or " ++ show e
 
 instance Read KType where
   readsPrec _ = readP_to_S parseKType
@@ -159,10 +170,14 @@ data KittyError
   deriving (Eq)
 
 instance Show KittyError where
-  show (TypeError msg) = "Type Error: " ++ msg
-  show (ParseError msg) = "Parse Error: Not a valid Kitty program" ++ msg
-  show (DoesNotExistError msg) = "DoesNotExist Error: " ++ msg
-  show (UndefinedError msg) = "Undefined Error: " ++ msg
+  show (TypeError msg) =
+    "Type Error: " ++ msg
+  show (ParseError msg) =
+    "Parse Error: Not a valid Kitty program" ++ msg
+  show (DoesNotExistError msg) =
+    "DoesNotExist Error: " ++ msg
+  show (UndefinedError msg) =
+    "Undefined Error: " ++ msg
 
 type Defs = M.Map String KittyAST
 
@@ -170,9 +185,18 @@ type FType = M.Map String KType -- should always be KFun
 
 type VType = M.Map String KType
 
-data Env = Env {_definitions :: Defs, _variables :: Defs, _tmpResult :: KittyAST} deriving (Show)
+data Env = Env
+  { _definitions :: Defs,
+    _variables :: Defs,
+    _tmpResult :: KittyAST
+  }
+  deriving (Show)
 
-data TypeEnv = TypeEnv {_functionTypes :: FType, _varTypes :: VType} deriving (Show, Read, Eq)
+data TypeEnv = TypeEnv
+  { _functionTypes :: FType,
+    _varTypes :: VType
+  }
+  deriving (Show, Read, Eq)
 
 class ArithOperations a where
   add :: a -> a -> a
@@ -199,27 +223,50 @@ instance ProgramOutput KittyAST where
   toOutput None = ""
   toOutput (StrLit s) = s
   toOutput (DefType d) = show d
-  toOutput (Equal x y) = toOutput x ++ "==" ++ toOutput y
-  toOutput (NotEqual x y) = toOutput x ++ "=/=" ++ toOutput y
-  toOutput (Less x y) = toOutput x ++ "<" ++ toOutput y
-  toOutput (Greater x y) = toOutput x ++ ">" ++ toOutput y
-  toOutput (GreaterEq x y) = toOutput x ++ ">=" ++ toOutput y
-  toOutput (LessEq x y) = toOutput x ++ "<=" ++ toOutput y
-  toOutput (IntLit x) = show x
-  toOutput (FloatLit x) = show x
-  toOutput (Expr op e1 e2) = toOutput e1 ++ (opSymb op : toOutput e2)
-  toOutput (Parens e) = '(' : toOutput e ++ ")"
+  toOutput (Equal x y) =
+    toOutput x ++ "==" ++ toOutput y
+  toOutput (NotEqual x y) =
+    toOutput x ++ "=/=" ++ toOutput y
+  toOutput (Less x y) =
+    toOutput x ++ "<" ++ toOutput y
+  toOutput (Greater x y) =
+    toOutput x ++ ">" ++ toOutput y
+  toOutput (GreaterEq x y) =
+    toOutput x ++ ">=" ++ toOutput y
+  toOutput (LessEq x y) =
+    toOutput x ++ "<=" ++ toOutput y
+  toOutput (IntLit x) =
+    show x
+  toOutput (FloatLit x) =
+    show x
+  toOutput (Expr op e1 e2) =
+    toOutput e1 ++ (opSymb op : toOutput e2)
+  toOutput (Parens e) =
+    '(' : toOutput e ++ ")"
   toOutput (Call x) = show x
   toOutput (Variable v) = v
-  toOutput (BoolLit x) = map toLower $ show x
-  toOutput (And e1 e2) = toOutput e1 ++ " and " ++ toOutput e2
-  toOutput (Or e1 e2) = toOutput e1 ++ " or " ++ toOutput e2
-  toOutput (Xor e1 e2) = toOutput e1 ++ " xor " ++ toOutput e2
-  toOutput (Not e) = "not " ++ toOutput e
+  toOutput (BoolLit x) =
+    map toLower $ show x
+  toOutput (And e1 e2) =
+    toOutput e1 ++ " and " ++ toOutput e2
+  toOutput (Or e1 e2) =
+    toOutput e1 ++ " or " ++ toOutput e2
+  toOutput (Xor e1 e2) =
+    toOutput e1 ++ " xor " ++ toOutput e2
+  toOutput (Not e) =
+    "not " ++ toOutput e
   toOutput (Letter c) = show c
-  toOutput (If condition ifblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) ifblock)
-  toOutput (IfElse condition ifblock elseblock) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) ifblock) ++ "\nelse\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) elseblock)
-  toOutput (While condition loopBody) = "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) loopBody)
+  toOutput (If condition ifblock) =
+    "if " ++ toOutput condition ++ "\n" ++ foldl1 (++) (map ((++) "\n" . toOutput) ifblock)
+  toOutput (IfElse condition ifblock elseblock) =
+    "if " ++ toOutput condition
+      ++ "\n"
+      ++ foldl1 (++) (map ((++) "\n" . toOutput) ifblock)
+      ++ "\nelse\n"
+      ++ foldl1 (++) (map ((++) "\n" . toOutput) elseblock)
+  toOutput (While condition loopBody) =
+    "if " ++ toOutput condition ++ "\n"
+      ++ foldl1 (++) (map ((++) "\n" . toOutput) loopBody)
 
 -- | convert operator to the char representing it
 -- | used for printing an operator
