@@ -1,6 +1,15 @@
 {-# LANGUAGE InstanceSigs #-}
 
-module TypeChecker (typeOf, typeCheck, typeCheckPrint, typeCheckOutput, initialTypeEnv, updateTypeEnv, checkBlockType) where
+module TypeChecker
+  ( typeOf,
+    typeCheck,
+    typeCheckPrint,
+    typeCheckOutput,
+    initialTypeEnv,
+    updateTypeEnv,
+    checkBlockType,
+  )
+where
 
 import Control.Exception (TypeError)
 import Control.Exception.Base (typeError)
@@ -114,7 +123,16 @@ instance TypeCheckable KittyAST where
   typeOf (Not b) env =
     case typeOf b env of
       Right KBool -> Right KBool
-      _ -> Left $ TypeError ("wrong type: expected truth, but got " ++ showUnwrapped (typeOf b env) ++ "; not requires a value of type " ++ show KBool ++ " but has been given Type " ++ showUnwrapped (typeOf b env))
+      _ ->
+        Left $
+          TypeError
+            ( "wrong type: expected truth, but got "
+                ++ showUnwrapped (typeOf b env)
+                ++ "; not requires a value of type "
+                ++ show KBool
+                ++ " but has been given Type "
+                ++ showUnwrapped (typeOf b env)
+            )
   -- instance TypeCheckable CompOp where
   typeOf (Equal e1 e2) env
     | typeOf e1 env == typeOf e2 env = Right KBool
@@ -262,7 +280,9 @@ instance TypeCheckable KittyAST where
     | typeOf condition env /= Right KBool =
       Left $
         TypeError $
-          "condition for while loop must be a value of type truth, but a value of type " ++ showUnwrapped (typeOf condition env) ++ " was provided"
+          "condition for while loop must be a value of type truth, but a value of type "
+            ++ showUnwrapped (typeOf condition env)
+            ++ " was provided"
     | null whileblock = Right KVoid
     | otherwise = case foldM updateTypeEnv' env whileblock of
       Left err -> Left err
@@ -371,26 +391,40 @@ oneOfVoidIfMissing (OneOf a b) = OneOf a b
 oneOfVoidIfMissing x = OneOf x KVoid
 
 -- | unifies two values of Type Either a TypeEnv into one
-unifyMaybeTypeEnvs :: Either a TypeEnv -> Either a TypeEnv -> Either a TypeEnv
+unifyMaybeTypeEnvs ::
+  Either a TypeEnv ->
+  Either a TypeEnv ->
+  Either a TypeEnv
 unifyMaybeTypeEnvs (Left e) _ = Left e
 unifyMaybeTypeEnvs _ (Left e) = Left e
 unifyMaybeTypeEnvs (Right e1) (Right e2) =
   Right (unifyTypeEnvs e1 e2)
 
--- | helper function for making a tuple of two values where the first is an Either a b
+-- | helper function for making a tuple of two values
+-- | where the first is an Either a b
 makeEitherTuple :: Monad f => f a1 -> a2 -> f (a1, a2)
 makeEitherTuple eithera b = (,) <$> eithera <*> return b
 
--- | fold the updateTupeEnv' function over a foldable of KittyAST (e.g. a list)
-updateManyTypeEnv :: Foldable t => TypeEnv -> t KittyAST -> Either KittyError TypeEnv
+-- | fold the updateTupeEnv' function
+-- | over a foldable of KittyAST (e.g. a list)
+updateManyTypeEnv ::
+  Foldable t =>
+  TypeEnv ->
+  t KittyAST ->
+  Either KittyError TypeEnv
 updateManyTypeEnv tenv e =
-  foldl (\tenv' e' -> tenv' >>= flip updateTypeEnv' e') (return tenv) e
+  foldl
+    (\tenv' e' -> tenv' >>= flip updateTypeEnv' e')
+    (return tenv)
+    e
 
--- | inserts a variable into the type environment and produces a new type environment or an error
+-- | inserts a variable into the type environment
+-- | and produces a new type environment or an error
 updateTypeEnv' :: TypeEnv -> KittyAST -> Either KittyError TypeEnv
-updateTypeEnv' tenv (DefType (AssignDef varname e)) = case typeOf e tenv of
-  Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)})
-  Left err -> Left err
+updateTypeEnv' tenv (DefType (AssignDef varname e)) =
+  case typeOf e tenv of
+    Right t -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)})
+    Left err -> Left err
 updateTypeEnv' tenv e = case typeOf e tenv of
   Right _ -> Right tenv
   Left err -> Left err
