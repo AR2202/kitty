@@ -9,7 +9,7 @@ module Evaluator
   )
 where
 
-import Control.Monad.Except (ExceptT (..), catchError, runExceptT, throwError)
+import Control.Monad.Except (ExceptT (..))
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (foldl1)
@@ -33,23 +33,35 @@ evalT env val = ExceptT $ return $ eval env val
 
 -- | the evaluation function
 eval :: Env -> KittyAST -> Either KittyError Env
-eval env (DefType (AssignDef varname vardef)) = case evalExpression env vardef of
-  Left err -> Left err
-  Right def -> Right $ env {_variables = M.insert varname def (_variables env)}
+eval env (DefType (AssignDef varname vardef)) =
+  case evalExpression env vardef of
+    Left err -> Left err
+    Right def ->
+      Right $
+        env
+          { _variables = M.insert varname def (_variables env)
+          }
 eval env (If b e) = case evalExpression env b of
   Right (BoolLit False) -> Right env
   Right (BoolLit True) -> evalMultiple env e
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
-eval env (UnwrapAs vname typename unwrappedName doBlock) = case evalExpression env vname of
-  --the value bound to the variable vname has to be retrieved and type-checked
-  Left err -> Left err
-  Right x -> case typeOf x initialTypeEnv of
+eval env (UnwrapAs vname typename unwrappedName doBlock) =
+  case evalExpression env vname of
+    --the value bound to the variable vname has to be retrieved and type-checked
     Left err -> Left err
-    Right tname ->
-      if tname == typename
-        then evalMultiple (env {_variables = M.insert unwrappedName x (_variables env)}) doBlock
-        else Right env
+    Right x -> case typeOf x initialTypeEnv of
+      Left err -> Left err
+      Right tname ->
+        if tname == typename
+          then
+            evalMultiple
+              ( env
+                  { _variables = M.insert unwrappedName x (_variables env)
+                  }
+              )
+              doBlock
+          else Right env
 eval env (IfElse b i e) = case evalExpression env b of
   Right (BoolLit False) -> evalMultiple env e
   Right (BoolLit True) -> evalMultiple env i
@@ -67,9 +79,12 @@ eval env e = case evalExpression env e of
 -- | evaluates the AST to an error or a new AST
 evalExpression :: Env -> KittyAST -> Either KittyError KittyAST
 evalExpression _ (IntLit i) = Right $ IntLit i
-evalExpression _ (Expr op (IntLit i) (IntLit j)) = Right $ IntLit $ evalOp op i j
-evalExpression _ (FloatLit i) = Right $ FloatLit i
-evalExpression _ (Expr op (FloatLit i) (FloatLit j)) = Right $ FloatLit $ evalOp op i j
+evalExpression _ (Expr op (IntLit i) (IntLit j)) =
+  Right $ IntLit $ evalOp op i j
+evalExpression _ (FloatLit i) =
+  Right $ FloatLit i
+evalExpression _ (Expr op (FloatLit i) (FloatLit j)) =
+  Right $ FloatLit $ evalOp op i j
 evalExpression _ (Expr op (IntLit i) (FloatLit j)) =
   Left $
     TypeError $
@@ -115,56 +130,84 @@ evalExpression env (Xor b1 b2)
 evalExpression env (Variable v) =
   evalVariable v env
     >>= evalExpression env
-evalExpression env (Not (BoolLit True)) = Right $ BoolLit False
-evalExpression env (Not (BoolLit False)) = Right $ BoolLit True
-evalExpression env (Not b) = evalExpression env b >>= \x -> evalExpression env (Not x)
-evalExpression env (GreaterEq (IntLit i) (IntLit j)) = Right $ BoolLit (i >= j)
-evalExpression env (GreaterEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i >= j)
-evalExpression env (GreaterEq e1 e2) = case evalExpression env e1 of
-  Left err -> Left err
-  Right e -> evalExpression env e2 >>= \x -> evalExpression env (GreaterEq e x)
-evalExpression env (LessEq (IntLit i) (IntLit j)) = Right $ BoolLit (i <= j)
-evalExpression env (LessEq (FloatLit i) (FloatLit j)) = Right $ BoolLit (i <= j)
-evalExpression env (LessEq e1 e2) = case evalExpression env e1 of
-  Left err -> Left err
-  Right e -> evalExpression env e2 >>= \x -> evalExpression env (LessEq e x)
-evalExpression env (Greater (IntLit i) (IntLit j)) = Right $ BoolLit (i > j)
-evalExpression env (Greater (FloatLit i) (FloatLit j)) = Right $ BoolLit (i > j)
+evalExpression env (Not (BoolLit True)) =
+  Right $ BoolLit False
+evalExpression env (Not (BoolLit False)) =
+  Right $ BoolLit True
+evalExpression env (Not b) =
+  evalExpression env b >>= \x -> evalExpression env (Not x)
+evalExpression env (GreaterEq (IntLit i) (IntLit j)) =
+  Right $ BoolLit (i >= j)
+evalExpression env (GreaterEq (FloatLit i) (FloatLit j)) =
+  Right $ BoolLit (i >= j)
+evalExpression env (GreaterEq e1 e2) =
+  case evalExpression env e1 of
+    Left err -> Left err
+    Right e -> evalExpression env e2 >>= \x -> evalExpression env (GreaterEq e x)
+evalExpression env (LessEq (IntLit i) (IntLit j)) =
+  Right $ BoolLit (i <= j)
+evalExpression env (LessEq (FloatLit i) (FloatLit j)) =
+  Right $ BoolLit (i <= j)
+evalExpression env (LessEq e1 e2) =
+  case evalExpression env e1 of
+    Left err -> Left err
+    Right e -> evalExpression env e2 >>= \x -> evalExpression env (LessEq e x)
+evalExpression env (Greater (IntLit i) (IntLit j)) =
+  Right $ BoolLit (i > j)
+evalExpression env (Greater (FloatLit i) (FloatLit j)) =
+  Right $ BoolLit (i > j)
 evalExpression env (Greater e1 e2) = case evalExpression env e1 of
   Left err -> Left err
   Right e -> evalExpression env e2 >>= \x -> evalExpression env (Greater e x)
-evalExpression env (Less (IntLit i) (IntLit j)) = Right $ BoolLit (i < j)
-evalExpression env (Less (FloatLit i) (FloatLit j)) = Right $ BoolLit (i < j)
+evalExpression env (Less (IntLit i) (IntLit j)) =
+  Right $ BoolLit (i < j)
+evalExpression env (Less (FloatLit i) (FloatLit j)) =
+  Right $ BoolLit (i < j)
 evalExpression env (Less e1 e2) = case evalExpression env e1 of
   Left err -> Left err
   Right e -> evalExpression env e2 >>= \x -> evalExpression env (Less e x)
-evalExpression env (Equal (IntLit i) (IntLit j)) = Right $ BoolLit (i == j)
-evalExpression env (Equal (FloatLit i) (FloatLit j)) = Right $ BoolLit (i == j)
-evalExpression env (Equal (BoolLit i) (BoolLit j)) = Right $ BoolLit (i == j)
-evalExpression env (Equal (StrLit i) (StrLit j)) = Right $ BoolLit (i == j)
-evalExpression env (Equal (Letter i) (Letter j)) = Right $ BoolLit (i == j)
-evalExpression env (Equal e1 e2) = case evalExpression env e1 of
-  Left err -> Left err
-  Right e -> evalExpression env e2 >>= \x -> evalExpression env (Equal e x)
-evalExpression env (NotEqual (IntLit i) (IntLit j)) = Right $ BoolLit (i /= j)
-evalExpression env (NotEqual (FloatLit i) (FloatLit j)) = Right $ BoolLit (i /= j)
-evalExpression env (NotEqual (BoolLit i) (BoolLit j)) = Right $ BoolLit (i /= j)
-evalExpression env (NotEqual (StrLit i) (StrLit j)) = Right $ BoolLit (i /= j)
-evalExpression env (NotEqual (Letter i) (Letter j)) = Right $ BoolLit (i /= j)
+evalExpression env (Equal (IntLit i) (IntLit j)) =
+  Right $ BoolLit (i == j)
+evalExpression env (Equal (FloatLit i) (FloatLit j)) =
+  Right $ BoolLit (i == j)
+evalExpression env (Equal (BoolLit i) (BoolLit j)) =
+  Right $ BoolLit (i == j)
+evalExpression env (Equal (StrLit i) (StrLit j)) =
+  Right $ BoolLit (i == j)
+evalExpression env (Equal (Letter i) (Letter j)) =
+  Right $ BoolLit (i == j)
+evalExpression env (Equal e1 e2) =
+  case evalExpression env e1 of
+    Left err -> Left err
+    Right e -> evalExpression env e2 >>= \x -> evalExpression env (Equal e x)
+evalExpression env (NotEqual (IntLit i) (IntLit j)) =
+  Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (FloatLit i) (FloatLit j)) =
+  Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (BoolLit i) (BoolLit j)) =
+  Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (StrLit i) (StrLit j)) =
+  Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (Letter i) (Letter j)) =
+  Right $ BoolLit (i /= j)
 evalExpression env (NotEqual e1 e2) = case evalExpression env e1 of
   Left err -> Left err
   Right e -> evalExpression env e2 >>= \x -> evalExpression env (NotEqual e x)
 evalExpression env (StrLit s) = Right (StrLit s)
 evalExpression env (Letter c) = Right (Letter c)
-evalExpression env (IfElse b i e) = case evalExpression env b of
-  Right (BoolLit False) -> evalMultipleExpr env e
-  Right (BoolLit True) -> evalMultipleExpr env i
-  Left err -> Left err
+evalExpression env (IfElse b i e) =
+  case evalExpression env b of
+    Right (BoolLit False) -> evalMultipleExpr env e
+    Right (BoolLit True) -> evalMultipleExpr env i
+    Left err -> Left err
 
 -- | looking up variable in program environment
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of
-  Nothing -> Left $ DoesNotExistError $ "the variable " ++ v ++ " does not exist"
+  Nothing ->
+    Left $
+      DoesNotExistError $
+        "the variable " ++ v ++ " does not exist"
   Just val -> Right val
 
 -- | evaluates the AST and converts the resulting environment to a string
@@ -182,26 +225,49 @@ evalOp Mult = mult
 evalOp Div = divide
 
 parseEvalAndPrintEnv :: T.Text -> Either ParseError String
-parseEvalAndPrintEnv text = evalAndPrintEnv initialEnv <$> parseAsAST text
+parseEvalAndPrintEnv text =
+  evalAndPrintEnv initialEnv
+    <$> parseAsAST text
 
 parseEvalAndPrintResult :: T.Text -> IO ()
-parseEvalAndPrintResult text = case evalAndPrintResult initialEnv <$> parseAsAST text of
+parseEvalAndPrintResult text = case evalAndPrintResult initialEnv
+  <$> parseAsAST text of
   Right (Right x) -> putStrLn x
   Right (Left err) -> print err
   Left err -> print err
-evalMultipleT :: Foldable t => Env -> t KittyAST -> ExceptT KittyError IO Env
-evalMultipleT env = foldl (\env' e -> env' >>= (flip evalT) e) (ExceptT( return (Right env)))
 
-evalMultiple :: Foldable t => Env -> t KittyAST -> Either KittyError Env
-evalMultiple env = foldl (\env' e -> env' >>= (flip eval) e) (Right env)
+evalMultipleT ::
+  Foldable t =>
+  Env ->
+  t KittyAST ->
+  ExceptT KittyError IO Env
+evalMultipleT env =
+  foldl
+    (\env' e -> env' >>= (flip evalT) e)
+    (ExceptT (return (Right env)))
 
-evalMultipleExpr :: Foldable t => Env -> t KittyAST -> Either KittyError KittyAST
+evalMultiple ::
+  Foldable t =>
+  Env ->
+  t KittyAST ->
+  Either KittyError Env
+evalMultiple env =
+  foldl
+    (\env' e -> env' >>= (flip eval) e)
+    (Right env)
+
+evalMultipleExpr ::
+  Foldable t =>
+  Env ->
+  t KittyAST ->
+  Either KittyError KittyAST
 evalMultipleExpr env astlist = case evalMultiple env astlist of
   Left err -> Left err
   Right env' -> Right $ _tmpResult env'
 
 parseEvalMultiline :: T.Text -> Either KittyError Env
-parseEvalMultiline text = case traverse parseAsAST $ filter (not . T.null) $ T.lines text of
+parseEvalMultiline text = case traverse parseAsAST $
+  filter (not . T.null) $ T.lines text of
   Right asts -> case checkBlockType asts initialTypeEnv of
     Left err -> Left err
     _ -> evalMultiple initialEnv asts
