@@ -394,7 +394,7 @@ varParser = do
   firstChar <- alphaNum
   rest <- many alphaNum
   let varname = firstChar : rest
-  void space <|> eof <|> void endOfLine <|> void tab
+  void space <|> eof <|> void endOfLine <|> void tab <|> void(lookAhead (char ')'))
   void spaces
   guard (varname `notElem` keywords)
   return $ Variable varname

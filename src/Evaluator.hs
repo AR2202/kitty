@@ -6,7 +6,7 @@ module Evaluator
     evalMultiple,
     initialEnv,
     parseEvalFile,
-    parseReplT
+    parseReplT,
   )
 where
 
@@ -31,11 +31,18 @@ initialEnv = Env M.empty M.empty None
 -- | the evaluation using Monad Transformer
 evalT :: Env -> KittyAST -> ExceptT KittyError IO Env
 evalT env (Print (Parens x)) = do
-        liftIO $ putStrLn $ toOutput x 
-        return env
+  liftIO $ putStrLn $ toOutput x
+  return env
+evalT env (Print (Variable x)) = do
+  liftIO $
+    putStrLn $
+      toOutput $
+        M.findWithDefault (StrLit "variable not found") x $ --this should not happen
+          _variables env
+  return env
 evalT env (Print x) = do
-        liftIO $ putStrLn $ toOutput x 
-        return env
+  liftIO $ putStrLn $ toOutput x
+  return env
 evalT env val = ExceptT $ return $ eval env val
 
 -- | the evaluation function
