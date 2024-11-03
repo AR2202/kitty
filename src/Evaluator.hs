@@ -30,6 +30,9 @@ initialEnv = Env M.empty M.empty None
 
 -- | the evaluation using Monad Transformer
 evalT :: Env -> KittyAST -> ExceptT KittyError IO Env
+evalT env (Print (Parens x)) = do
+        liftIO $ putStrLn $ toOutput x 
+        return env
 evalT env (Print x) = do
         liftIO $ putStrLn $ toOutput x 
         return env
