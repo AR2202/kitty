@@ -288,7 +288,42 @@ instance TypeCheckable KittyAST where
       Left err -> Left err
       Right env -> typeOf (last whileblock) env -- type of the last expression
       -- still undecided if this is the desired behaviour
-  typeOf (Print _) _ = Right KVoid
+  typeOf (Print (StrLit _)) _ = Right KVoid -- this is the correct useage
+  typeOf (Print (Letter _)) _ = Right KVoid -- Char is automatically coerced
+  -- printing any other literal should result in a type error
+  typeOf (Print (IntLit _)) _ =
+    Left $
+      TypeError $
+        "whole number can't be printed; please convert ot text"
+  typeOf (Print (FloatLit _)) _ =
+    Left $
+      TypeError $
+        "decimal number can't be printed; please convert ot text"
+  typeOf (Print (BoolLit _)) _ =
+    Left $
+      TypeError $
+        "truth value can't be printed; please convert ot text"
+  typeOf (Print (DefType _)) _ =
+    Left $
+      TypeError $
+        "Definition can't be printed"
+  typeOf (Print (Call _)) _ =
+    Left $
+      TypeError $
+        "Function call can't be printed"
+  typeOf (Print (Print _)) _ =
+    Left $
+      TypeError $
+        "Print Statement call can't be printed"
+  typeOf (Print (Parens x)) e = typeOf (Print x) e -- discard parentheses
+  typeOf (Print x) e = case typeOf x e of 
+    Left err -> Left err
+    Right KString -> Right KVoid
+    t -> Left $
+      TypeError $
+      "value of type "
+      ++showUnwrapped t
+      ++ " can't be printed. Convert to text; only text can be printed"
 
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid

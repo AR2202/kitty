@@ -11,6 +11,9 @@ import Parser
 import System.IO (hFlush, stdout)
 import System.IO.Error (ioeGetErrorType, isDoesNotExistErrorType)
 import TypeChecker
+import Control.Monad.Except (runExceptT)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
 
 -- | the entry point of the Kitty REPL
 repl :: IO ()
@@ -56,11 +59,15 @@ repl' env tenv = do
 
             case updateTypeEnv tenv (T.pack input) of
               Left err -> print err >> repl' env tenv
-              Right (newtenv, t) -> case parseRepl env (T.pack input) of
-                Left err -> print err >> repl' env tenv
-                Right newenv ->
-                  putStrLn ((toOutput . _tmpResult) newenv)
-                    >> repl' newenv newtenv
+              
+              Right (newtenv, t) -> do
+                result <- runExceptT (parseReplT env (T.pack input))
+                case result of
+                  Left err -> print err >> repl' env tenv
+                  Right newenv -> do
+                    putStrLn ((toOutput . _tmpResult) newenv)
+                    repl' newenv newtenv
+
 
 -- | reads a file from FilePath if path exists and returns content,
 -- | otherwise returns an error message string

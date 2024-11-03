@@ -1,6 +1,24 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module KittyTypes (Operator (..), KittyAST (..), Env (..), TypeEnv (..), KittyError (..), ArithOperations, FunctionDefinition (..), Definition (..), KType (..), FunctionCall (..), add, sub, divide, mult, toOutput, opSymb) where
+module KittyTypes
+  ( Operator (..),
+    KittyAST (..),
+    Env (..),
+    TypeEnv (..),
+    KittyError (..),
+    ArithOperations,
+    FunctionDefinition (..),
+    Definition (..),
+    KType (..),
+    FunctionCall (..),
+    add,
+    sub,
+    divide,
+    mult,
+    toOutput,
+    opSymb,
+  )
+where
 
 import Control.Applicative ((<|>))
 import Data.Char (isSpace, toLower)
@@ -173,7 +191,7 @@ instance Show KittyError where
   show (TypeError msg) =
     "Type Error: " ++ msg
   show (ParseError msg) =
-    "Parse Error: Not a valid Kitty program" ++ msg
+    "Parse Error: Not a valid Kitty program " ++ msg
   show (DoesNotExistError msg) =
     "DoesNotExist Error: " ++ msg
   show (UndefinedError msg) =

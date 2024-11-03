@@ -6,6 +6,7 @@ module Evaluator
     evalMultiple,
     initialEnv,
     parseEvalFile,
+    parseReplT
   )
 where
 
@@ -29,6 +30,9 @@ initialEnv = Env M.empty M.empty None
 
 -- | the evaluation using Monad Transformer
 evalT :: Env -> KittyAST -> ExceptT KittyError IO Env
+evalT env (Print x) = do
+        liftIO $ putStrLn $ toOutput x 
+        return env
 evalT env val = ExceptT $ return $ eval env val
 
 -- | the evaluation function
@@ -278,10 +282,20 @@ parseEvalPrintMultiline text = case parseEvalMultiline text of
   Left err -> print err
   Right env -> putStrLn $ toOutput $ _tmpResult env
 
+-- | parses and evaluates expression entered to REPL
 parseRepl :: Env -> T.Text -> Either KittyError Env
 parseRepl env text = case traverse parseAsAST $ T.lines text of
   Right asts -> evalMultiple env asts
   Left _ -> Left $ KittyTypes.ParseError (T.unpack text)
+
+-- | Monad transformer version of parseRepl
+parseReplT :: Env -> T.Text -> ExceptT KittyError IO Env
+parseReplT env text = case traverse parseAsAST $ T.lines text of
+  Right asts -> evalMultipleT env asts
+  Left _ ->
+    ExceptT $
+      return $
+        Left $ KittyTypes.ParseError (T.unpack text)
 
 -- | parses and executes code from a file
 -- | currently throws an error if filepath doesn't exit -fix
