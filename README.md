@@ -92,5 +92,7 @@ Currently, kitty has the following types:
 * wholeNumber (corresponding to int)
 * decimalNumber (corresponding to float)
 * text (corresponding to string)
+* letter (corresponding to char)
 * truth (corresponding to bool)
+* empty (corresponding to void)
 * oneOf type1 or type2 (a union type of type1 type2; corresponding to, e.g., Either in Haskell or Result in Rust)
