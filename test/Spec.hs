@@ -23,6 +23,8 @@ main = hspec $
     parseboolParensLast
     parseBoolOp
     parseIfInWhile
+    parsePrintInWhile
+    parseIfInIf
     --addFailsWithoutAdd
     parseNumInsidePrint
     parseStrInsidePrint
@@ -174,16 +176,42 @@ parseBoolOp =
 
 ifInsideWhile :: Expectation
 ifInsideWhile =
-  parseAsAST "if  true  then if true then print(2) endif endif"
-    `shouldBe` Right (If (BoolLit True) [If (BoolLit True) [Print (IntLit 2)]])
+  parseAsAST "while  true do if true then print(2) endif endwhile"
+    `shouldBe` Right (While (BoolLit True) [If (BoolLit True) [Print (IntLit 2)]])
 
 parseIfInWhile :: SpecWith ()
 parseIfInWhile =
   describe "parseAsAST" $
     context "when parsing if nested in while" $
       it
-        "should parse it is while loop with if"
+        "should parse it as while loop with if"
         ifInsideWhile
+
+printInsideWhile :: Expectation
+printInsideWhile =
+  parseAsAST "while true do print(\"true\") endwhile"
+    `shouldBe` Right (While (BoolLit True)  [Print (StrLit "true")])
+
+parsePrintInWhile :: SpecWith ()
+parsePrintInWhile =
+  describe "parseAsAST" $
+    context "when parsing print in while" $
+      it
+        "should parse it as while loop with print"
+        printInsideWhile
+
+ifInsideIf :: Expectation
+ifInsideIf =
+  parseAsAST "if  true  then if true then print(2) endif endif"
+    `shouldBe` Right (If (BoolLit True) [If (BoolLit True) [Print (IntLit 2)]])
+
+parseIfInIf :: SpecWith ()
+parseIfInIf =
+  describe "parseAsAST" $
+    context "when parsing if nested in if" $
+      it
+        "should parse it as nested if"
+        ifInsideIf
 
 numInsidePrint :: Expectation
 numInsidePrint =
