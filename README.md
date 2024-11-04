@@ -58,6 +58,7 @@ Eg.
 The variable myvar would then have type oneOf wholeNumber or text and has to be destructured before use. This would result in a type error:
 
 `myvar + 2`
+
 typeError: 
 
 To unwrap a oneOf:
@@ -70,7 +71,26 @@ If the different branches assign the same type to the variable, kitty unifies th
 
 `mynewvar + 5`
 
+### while loops
 
+while loops can be used to execute code repeatedly, as long as
+a specific condition evaluates to true.
+`while [condition] do [code block] endwhile`
+
+#### Examples
+
+`x = 1`
+
+`while (x < 3) do x = x + 1 endwhile` 
+
+`x`
+
+x should now be 3.
+
+### using source files
+
+Instead of entering code in the REPL, it can be saved to a source file.
+The file can be loaded and evaluated with `evalFile [filepath]`.
 
 ### checking the type of an expression
 
