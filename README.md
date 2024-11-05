@@ -86,6 +86,15 @@ a specific condition evaluates to true.
 `x`
 
 x should now be 3.
+### print statements
+
+Only values of type text or letter can be printed.
+
+`print("hello world")`
+
+This will result in a type error:
+
+`print(2)`
 
 ### using source files
 
