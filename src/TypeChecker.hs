@@ -316,14 +316,16 @@ instance TypeCheckable KittyAST where
       TypeError $
         "Print Statement can't be printed"
   typeOf (Print (Parens x)) e = typeOf (Print x) e -- discard parentheses
-  typeOf (Print x) e = case typeOf x e of 
+  typeOf (Print x) e = case typeOf x e of
     Left err -> Left err
     Right KString -> Right KVoid
-    t -> Left $
-      TypeError $
-      "value of type "
-      ++ showUnwrapped t
-      ++ " can't be printed. Convert to text; only text can be printed"
+    t ->
+      Left $
+        TypeError $
+          "value of type "
+            ++ showUnwrapped t
+            ++ " can't be printed. Convert to text; only text can be printed"
+  typeOf (ToText x) e = Right KString
 
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid

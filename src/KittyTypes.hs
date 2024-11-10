@@ -164,6 +164,8 @@ data KittyAST
   | UnwrapAs KittyAST KType String [KittyAST] -- for unwrapping OneOfs
   | While KittyAST [KittyAST]
   | Print KittyAST
+  | BuiltIn String 
+  | ToText KittyAST
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition

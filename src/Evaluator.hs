@@ -40,6 +40,7 @@ evalT env (Print (Variable x)) = do
         M.findWithDefault (StrLit "variable not found") x $ --this should not happen
           _variables env
   return env
+evalT env (Print (ToText k)) = evalT env (Print (toText k))
 evalT env (Print x) = do
   liftIO $ putStrLn $ toOutput x
   return env
@@ -86,6 +87,7 @@ eval env (While c e) = case evalExpression env c of
   Right (BoolLit True) -> evalMultiple env e >>= flip eval (While c e)
   Left err -> Left err
   _ -> Left $ TypeError "Condition must have type truth"
+eval env (Print k) = eval env (toText k)
 eval env e = case evalExpression env e of
   Left err -> Left err
   Right res -> Right $ env {_tmpResult = res}
@@ -214,6 +216,7 @@ evalExpression env (IfElse b i e) =
     Right (BoolLit False) -> evalMultipleExpr env e
     Right (BoolLit True) -> evalMultipleExpr env i
     Left err -> Left err
+evalExpression env (ToText k) = evalExpression env (toText k)
 
 -- | looking up variable in program environment
 evalVariable :: String -> Env -> Either KittyError KittyAST
@@ -224,6 +227,12 @@ evalVariable v env = case M.lookup v (_variables env) of
         "the variable " ++ v ++ " does not exist"
   Just val -> Right val
 
+-- | convert to text
+toText (IntLit x) = StrLit (show x)
+toText (BoolLit b) = StrLit (show b)
+toText (FloatLit f) = StrLit (show f)
+toText (Letter l) = StrLit [l]
+toText _ = StrLit "not yet implemented"
 -- | evaluates the AST and converts the resulting environment to a string
 -- | for debugging
 evalAndPrintEnv :: Env -> KittyAST -> String

@@ -420,10 +420,19 @@ printParser =
       (spaces *> string ")" <* spaces)
       astSubParser''
 
+toTextParser :: Parser KittyAST
+toTextParser =
+  ToText
+    <$> between
+      (spaces *> string "toText" <* spaces <* string "(" <* spaces)
+      (spaces *> string ")" <* spaces)
+      astSubParser''
+
 -- | parses any AST variant
 astParser :: Parser KittyAST
 astParser =
   try printParser
+    <|> try toTextParser
     <|> try elseParser
     <|> try ifParser
     <|> try whileParser
@@ -436,9 +445,10 @@ astParser =
     <|> try stringParser
     <|> try notParser
     <|> try falseParser
-    <|> trueParser
+    <|> try trueParser
     <|> try floatParser
     <|> try intParser
+
     <|> varParser
 
 astTestParser :: Parser KittyAST
@@ -477,6 +487,7 @@ astSubParser =
 astSubParser'' :: Parser KittyAST
 astSubParser'' =
   try printParser
+    <|> try toTextParser
     <|> try elseParser
     <|> try ifParser
     <|> try astAssignParser
