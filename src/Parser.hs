@@ -395,7 +395,7 @@ varParser = do
   firstChar <- alphaNum
   rest <- many alphaNum
   let varname = firstChar : rest
-  void space <|> eof <|> void endOfLine <|> void tab <|> void(lookAhead (char ')'))
+  void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')'))
   void spaces
   guard (varname `notElem` keywords)
   return $ Variable varname
@@ -433,7 +433,9 @@ toTextParser =
 
 -- | parses a list definition
 listParser :: Parser KittyAST
-listParser = List  <$> between
+listParser =
+  List
+    <$> between
       (spaces *> string "list" <* spaces <* string "(" <* spaces)
       (spaces *> string ")" <* spaces)
       (astSubParser' `sepBy` string ",")
@@ -459,7 +461,6 @@ astParser =
     <|> try trueParser
     <|> try floatParser
     <|> try intParser
-
     <|> varParser
 
 astTestParser :: Parser KittyAST

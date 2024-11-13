@@ -166,7 +166,7 @@ data KittyAST
   | UnwrapAs KittyAST KType String [KittyAST] -- for unwrapping OneOfs
   | While KittyAST [KittyAST]
   | Print KittyAST
-  | BuiltIn String 
+  | BuiltIn String
   | ToText KittyAST
   | List [KittyAST]
   deriving (Show, Eq)
@@ -290,9 +290,10 @@ instance ProgramOutput KittyAST where
   toOutput (While condition loopBody) =
     "if " ++ toOutput condition ++ "\n"
       ++ foldl1 (++) (map ((++) "\n" . toOutput) loopBody)
-  toOutput (List xs) = "list("
-    ++ init (foldl1 (++) (map ((++ "," ). toOutput) xs))
-    ++")"
+  toOutput (List xs) =
+    "list("
+      ++ init (foldl1 (++) (map ((++ ",") . toOutput) xs))
+      ++ ")"
 
 -- | convert operator to the char representing it
 -- | used for printing an operator
