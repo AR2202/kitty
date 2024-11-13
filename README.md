@@ -96,6 +96,24 @@ This will result in a type error:
 
 `print(2)`
 
+### converting values to text
+
+Currently, the following types can be converted to text with the `toText` keyword:
+
+* wholeNumber
+* decimalNumber
+* truth
+
+### Examples
+
+`toText(2)`
+
+`x = true`
+
+`toText(x)`
+
+`print(toText(2.4))`
+
 ### using source files
 
 Instead of entering code in the REPL, it can be saved to a source file.
