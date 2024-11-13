@@ -38,6 +38,7 @@ data KType
   | KVoid
   | OneOf KType KType
   | KFun ([KType], [KType])
+  | KList KType
   deriving (Eq)
 
 instance Show KType where
@@ -51,6 +52,7 @@ instance Show KType where
     foldl1' (++) (map show args) ++ "->" ++ foldl1' (++) (map show returns)
   show (OneOf i e) =
     "one of " ++ show i ++ " or " ++ show e
+  show (KList t) = "List of " ++ show t -- consider renaming
 
 instance Read KType where
   readsPrec _ = readP_to_S parseKType
@@ -166,6 +168,7 @@ data KittyAST
   | Print KittyAST
   | BuiltIn String 
   | ToText KittyAST
+  | List [KittyAST]
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition
@@ -287,6 +290,9 @@ instance ProgramOutput KittyAST where
   toOutput (While condition loopBody) =
     "if " ++ toOutput condition ++ "\n"
       ++ foldl1 (++) (map ((++) "\n" . toOutput) loopBody)
+  toOutput (List xs) = "list("
+    ++ init (foldl1 (++) (map ((++ "," ). toOutput) xs))
+    ++")"
 
 -- | convert operator to the char representing it
 -- | used for printing an operator

@@ -99,6 +99,8 @@ evalExpression _ (Expr op (IntLit i) (IntLit j)) =
   Right $ IntLit $ evalOp op i j
 evalExpression _ (FloatLit i) =
   Right $ FloatLit i
+evalExpression _ (List xs) =
+  Right $ List xs
 evalExpression _ (Expr op (FloatLit i) (FloatLit j)) =
   Right $ FloatLit $ evalOp op i j
 evalExpression _ (Expr op (IntLit i) (FloatLit j)) =

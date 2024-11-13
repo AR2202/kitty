@@ -289,6 +289,7 @@ assignmentParser =
                    <|> try falseParser
                    <|> try floatParser
                    <|> try intParser
+                   <|> try listParser
                    <|> varParser
                )
             <* spaces
@@ -409,7 +410,9 @@ varParser = do
         "do",
         "while",
         "endwhile",
-        "print"
+        "print",
+        "toText",
+        "list"
       ]
 
 printParser :: Parser KittyAST
@@ -428,11 +431,19 @@ toTextParser =
       (spaces *> string ")" <* spaces)
       astSubParser''
 
+-- | parses a list definition
+listParser :: Parser KittyAST
+listParser = List  <$> between
+      (spaces *> string "list" <* spaces <* string "(" <* spaces)
+      (spaces *> string ")" <* spaces)
+      (astSubParser' `sepBy` string ",")
+
 -- | parses any AST variant
 astParser :: Parser KittyAST
 astParser =
   try printParser
     <|> try toTextParser
+    <|> try listParser
     <|> try elseParser
     <|> try ifParser
     <|> try whileParser
@@ -488,6 +499,7 @@ astSubParser'' :: Parser KittyAST
 astSubParser'' =
   try printParser
     <|> try toTextParser
+    <|> try listParser
     <|> try elseParser
     <|> try ifParser
     <|> try astAssignParser

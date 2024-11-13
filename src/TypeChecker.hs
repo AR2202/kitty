@@ -326,6 +326,12 @@ instance TypeCheckable KittyAST where
             ++ showUnwrapped t
             ++ " can't be printed. Convert to text; only text can be printed"
   typeOf (ToText x) e = Right KString
+  typeOf (List xs) e = case (traverse  (`typeOf` e) xs) of
+    Left typerr -> Left typerr
+    Right [] -> Right $ KList KVoid
+    Right (t:ts) -> if all (== t) ts 
+      then Right $ KList t 
+      else Left $ TypeError $ "all values in a list must have the same type"
 
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
