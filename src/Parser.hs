@@ -1,11 +1,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parser (intParser, parseUnwrap, parseAsInt, parseAsFloat, parseAsAdd, parseAsOperator, parseAsASTTest, parseAsBoolOp, parseAsAST, parseAsIf, parseAsIfCond, parseIfBlock) where
+module Parser
+  ( intParser,
+    parseUnwrap,
+    parseAsInt,
+    parseAsFloat,
+    parseAsAdd,
+    parseAsOperator,
+    parseAsASTTest,
+    parseAsBoolOp,
+    parseAsAST,
+    parseAsIf,
+    parseAsIfCond,
+    parseIfBlock,
+    parseAsASTMultiline,
+  )
+where
 
 -- import qualified Data.Text as T
 
 -- import Text.Parsec.Expr
-
+import Debug.Trace (trace)
 import Control.Monad (guard, void)
 import qualified Data.Text as T
 import KittyTypes
@@ -22,12 +37,25 @@ Parsing from Test directly into AST type without lexing step-}
 intParser :: Parser KittyAST
 intParser =
   IntLit . read
-    <$> (spaces *> (many1 digit <|> ((++) <$> string "-" <*> many1 digit)) <* spaces)
+    <$> ( spaces
+            *> ( many1 digit
+                   <|> ((++) <$> string "-" <*> many1 digit)
+               )
+            <* spaces
+        )
 
 floatParser :: Parser KittyAST
 floatParser =
   FloatLit . read
-    <$> ((++) <$> (spaces *> (many1 digit <|> ((++) <$> string "-" <*> many1 digit))) <*> ((:) <$> char '.' <*> many1 digit) <* spaces)
+    <$> ( (++)
+            <$> ( spaces
+                    *> ( many1 digit
+                           <|> ((++) <$> string "-" <*> many1 digit)
+                       )
+                )
+            <*> ((:) <$> char '.' <*> many1 digit)
+            <* spaces
+        )
 
 operatorParser :: Parser Operator
 operatorParser =
@@ -171,7 +199,7 @@ andop =
 orop :: Parser (KittyAST -> KittyAST -> KittyAST)
 orop =
   Or
-    <$ ( string
+    <$ (spaces *>  string
            "or"
            >> notFollowedBy alphaNum
        )
@@ -280,8 +308,6 @@ assignmentParser =
                    <|> try whileParser
                    <|> try stringParser
                    <|> try charParser
-                   <|> try astSubParser
-                   <|> try boolopParser
                    <|> try addParser
                    <|> try mulParser
                    <|> try compParser
@@ -308,12 +334,15 @@ ifParser = If <$> ifCondParser <*> ifBlockParser
 elseParser :: Parser KittyAST
 elseParser =
   IfElse
-    <$> ifCondParser <*> ifBlockParser <*> elseBlockParser
+    <$> ifCondParser
+    <*> ifBlockParser
+    <*> elseBlockParser
 
 whileParser :: Parser KittyAST
 whileParser =
   While
-    <$> whileCondParser <*> whileBlockParser
+    <$> whileCondParser
+    <*> whileBlockParser
 
 ifCondParser =
   between
@@ -325,7 +354,7 @@ whileCondParser =
   between
     (spaces *> string "while" <* spaces)
     (lookAhead (spaces *> string "do" <* spaces))
-    astSubParser
+    astSubParser --should this be astSubParser''?
 
 ifBlockParser =
   between
@@ -333,7 +362,7 @@ ifBlockParser =
     ( spaces *> (try (string "endif"))
         <|> (lookAhead (string "else")) <* spaces
     )
-    (many astSubParser'')
+    (many astWithOptionalEOL)
 
 elseBlockParser =
   between
@@ -363,9 +392,9 @@ unwrappedTypeParser =
 unwrapParser =
   UnwrapAs
     <$> unwrapVarParser
-      <*> unwrappedTypeParser
-      <*> many1 alphaNum
-      <*> unwrapBlockParser
+    <*> unwrappedTypeParser
+    <*> many1 alphaNum
+    <*> unwrapBlockParser
 
 -- | type name parser
 -- no support for OneOf yet
@@ -390,15 +419,17 @@ unwrapBlockParser =
 
 -- | parse variables
 varParser :: Parser KittyAST
-varParser = do
-  void spaces
-  firstChar <- alphaNum
-  rest <- many alphaNum
-  let varname = firstChar : rest
-  void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')'))
-  void spaces
-  guard (varname `notElem` keywords)
-  return $ Variable varname
+varParser =
+  do
+    void spaces
+    firstChar <- alphaNum
+    rest <- many alphaNum
+    let varname = firstChar : rest
+    guard(varname `notElem` keywords)
+    void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')'))
+    void spaces
+    
+    return$ Variable varname
   where
     keywords =
       [ "if",
@@ -412,7 +443,11 @@ varParser = do
         "endwhile",
         "print",
         "toText",
-        "list"
+        "list",
+        "true",
+        "false",
+        "or",
+        "and"
       ]
 
 printParser :: Parser KittyAST
@@ -438,7 +473,7 @@ listParser =
     <$> between
       (spaces *> string "list" <* spaces <* string "(" <* spaces)
       (spaces *> string ")" <* spaces)
-      (astSubParser' `sepBy` string ",")
+      (astSubParser'' `sepBy` string ",")
 
 -- | parses any AST variant
 astParser :: Parser KittyAST
@@ -460,7 +495,7 @@ astParser =
     <|> try falseParser
     <|> try trueParser
     <|> try floatParser
-    <|> try intParser
+    <|> try intParser   
     <|> varParser
 
 astTestParser :: Parser KittyAST
@@ -483,7 +518,8 @@ astTestParser =
 -- | parses  AST subexpression for use within KittyAST
 astSubParser :: Parser KittyAST
 astSubParser =
-  try addParser <|> try elseParser
+  try addParser
+    <|> try elseParser
     <|> try ifParser
     <|> try mulParser
     <|> try parensParser
@@ -514,6 +550,24 @@ astSubParser'' =
     <|> try trueParser
     <|> try falseParser
     <|> try varParser
+
+astWithOptionalEOL = do
+  expr <- astSubParser''
+  _ <- optional endOfLine
+  return expr
+
+astEOL = do
+  expr <- astParser
+  trace ("Parsed expression: " ++ show expr) (return ())
+  eol <- optional endOfLine
+  trace ("Matched EOL: " ++ show eol) (return ())
+  return expr
+
+astMultiline = do
+  lines <- many astEOL
+  trace ("Parsed lines: " ++ show lines) (return ())
+  eof
+  return lines
 
 -- | parses  AST subexpression for use within KittyAST
 astSubParser' :: Parser KittyAST
@@ -551,6 +605,10 @@ parseAsAdd = parse addParser "no file"
 -- | parsing an ast input - no file
 parseAsAST :: T.Text -> Either ParseError KittyAST
 parseAsAST = parse astParser "no file"
+
+-- | parsing an ast input multiple lines
+parseAsASTMultiline :: String -> T.Text -> Either ParseError [KittyAST]
+parseAsASTMultiline fname = parse astMultiline fname
 
 parseAsASTTest :: T.Text -> Either ParseError KittyAST
 parseAsASTTest = parse astTestParser "no file"

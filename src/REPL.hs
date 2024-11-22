@@ -52,7 +52,7 @@ repl' env tenv = do
         --evaluates the file on the path prvided
 
           if "evalFile " `isPrefixOf` input
-            then parseEvalFile (drop 9 input) >> repl' env tenv
+            then parseEvalTFile (drop 9 input) >> repl' env tenv
             else -- type checking first, but printing result of type checking
             -- only if type error
             -- otherwise, continue with evaluation

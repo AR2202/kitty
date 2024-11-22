@@ -6,16 +6,19 @@ module Evaluator
     evalMultiple,
     initialEnv,
     parseEvalFile,
+    parseEvalFile',
     parseReplT,
+    parseEvalTFile,
   )
 where
 
-import Control.Monad.Except (ExceptT (..))
+import Control.Monad.Except (ExceptT (..), runExceptT)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (foldl1)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Text.Lazy (toLower)
 import KittyTypes
 import Parser
 import Text.Parsec.Error
@@ -40,7 +43,9 @@ evalT env (Print (Variable x)) = do
         M.findWithDefault (StrLit "variable not found") x $ --this should not happen
           _variables env
   return env
-evalT env (Print (ToText k)) = evalT env (Print (toText k))
+evalT env (Print (ToText k)) = case evalExpression env (ToText k) of
+  Left err -> ExceptT $ return $ Left err
+  Right s -> evalT env (Print s)
 evalT env (Print x) = do
   liftIO $ putStrLn $ toOutput x
   return env
@@ -218,6 +223,9 @@ evalExpression env (IfElse b i e) =
     Right (BoolLit False) -> evalMultipleExpr env e
     Right (BoolLit True) -> evalMultipleExpr env i
     Left err -> Left err
+evalExpression env (ToText (Variable v)) = case evalVariable v env of
+  Left err -> Left err
+  Right val -> evalExpression env (toText val)
 evalExpression env (ToText k) = evalExpression env (toText k)
 
 -- | looking up variable in program environment
@@ -230,11 +238,13 @@ evalVariable v env = case M.lookup v (_variables env) of
   Just val -> Right val
 
 -- | convert to text
+toText :: KittyAST -> KittyAST
 toText (IntLit x) = StrLit (show x)
-toText (BoolLit b) = StrLit (show b)
+toText (BoolLit b) = StrLit (toOutput (BoolLit b))
 toText (FloatLit f) = StrLit (show f)
 toText (Letter l) = StrLit [l]
 toText _ = StrLit "not yet implemented"
+
 -- | evaluates the AST and converts the resulting environment to a string
 -- | for debugging
 evalAndPrintEnv :: Env -> KittyAST -> String
@@ -303,6 +313,28 @@ parseEvalPrintMultiline text = case parseEvalMultiline text of
   Left err -> print err
   Right env -> putStrLn $ toOutput $ _tmpResult env
 
+parseEvalPrintFromFile :: String -> T.Text -> IO ()
+parseEvalPrintFromFile fname text = case parseEvalTextFromFile fname text of
+  Left err -> print err
+  Right env -> putStrLn $ toOutput $ _tmpResult env
+
+parseEvalTextFromFile :: String -> T.Text -> Either KittyError Env
+parseEvalTextFromFile fname text = case parseAsASTMultiline fname text of
+  Right asts -> case checkBlockType asts initialTypeEnv of
+    Left err -> Left err
+    _ -> evalMultiple initialEnv asts
+  Left _ -> Left $ KittyTypes.ParseError (T.unpack text)
+
+parseEvalTFromFile :: String -> T.Text -> ExceptT KittyError IO Env
+parseEvalTFromFile fname text = case parseAsASTMultiline fname text of
+  Right asts -> case checkBlockType asts initialTypeEnv of
+    Left err -> ExceptT $ return $ Left err
+    _ -> evalMultipleT initialEnv asts
+  Left _ ->
+    ExceptT $
+      return $
+        Left $ KittyTypes.ParseError (T.unpack text)
+
 -- | parses and evaluates expression entered to REPL
 parseRepl :: Env -> T.Text -> Either KittyError Env
 parseRepl env text = case traverse parseAsAST $ T.lines text of
@@ -318,9 +350,29 @@ parseReplT env text = case traverse parseAsAST $ T.lines text of
       return $
         Left $ KittyTypes.ParseError (T.unpack text)
 
+-- | Monad transformer version of parseEvalPrintFromFile
+parseEvalPrintFromFileT :: String -> T.Text -> IO ()
+parseEvalPrintFromFileT filename text = do
+  result <- runExceptT (parseEvalTFromFile filename text)
+  case result of
+    Left err -> print err
+    Right newenv -> putStrLn ((toOutput . _tmpResult) newenv)
+
 -- | parses and executes code from a file
 -- | currently throws an error if filepath doesn't exit -fix
 parseEvalFile :: String -> IO ()
 parseEvalFile filepath = do
   contents <- readFile filepath
   parseEvalPrintMultiline $ T.pack contents
+
+-- | parses and executes code from a file
+-- | currently throws an error if filepath doesn't exit -fix
+parseEvalFile' :: String -> IO ()
+parseEvalFile' filepath = do
+  contents <- readFile filepath
+  parseEvalPrintFromFile filepath $ T.pack contents
+
+parseEvalTFile :: String -> IO ()
+parseEvalTFile filepath = do
+  contents <- readFile filepath
+  parseEvalPrintFromFileT filepath $ T.pack contents

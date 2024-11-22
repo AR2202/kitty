@@ -1,4 +1,4 @@
-
-true and false
-true and true
-true + 5
+b = true and false
+y = 1
+print(toText(1))
+print(toText(false))
