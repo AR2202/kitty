@@ -258,6 +258,9 @@ toNum :: KittyAST -> Either KittyError KittyAST
 toNum (StrLit x) = case readMaybeInt x of
   Nothing -> Left $ TypeConversionError $ (show x ++ " can't be converted to a whole Number")
   Just i -> Right $ IntLit i
+toNum (Letter c) = toNum (StrLit [c])
+toNum _ = Left $ TypeError " Only text and letters can be converted to numbers" 
+-- this should really be done by the type checker
 
 readMaybeInt :: String -> Maybe Int 
 readMaybeInt = readMaybe
