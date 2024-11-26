@@ -20,9 +20,10 @@ where
 -- import qualified Data.Text as T
 
 -- import Text.Parsec.Expr
-import Debug.Trace (trace)
+
 import Control.Monad (guard, void)
 import qualified Data.Text as T
+import Debug.Trace (trace)
 import KittyTypes
 import Text.Parsec
 import qualified Text.Parsec.Language as Lang
@@ -199,8 +200,9 @@ andop =
 orop :: Parser (KittyAST -> KittyAST -> KittyAST)
 orop =
   Or
-    <$ (spaces *>  string
-           "or"
+    <$ ( spaces
+           *> string
+             "or"
            >> notFollowedBy alphaNum
        )
 
@@ -425,11 +427,11 @@ varParser =
     firstChar <- alphaNum
     rest <- many alphaNum
     let varname = firstChar : rest
-    guard(varname `notElem` keywords)
+    guard (varname `notElem` keywords)
     void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')'))
     void spaces
-    
-    return$ Variable varname
+
+    return $ Variable varname
   where
     keywords =
       [ "if",
@@ -448,7 +450,9 @@ varParser =
         "true",
         "false",
         "or",
-        "and"
+        "and",
+        "push",
+        "pop"
       ]
 
 printParser :: Parser KittyAST
@@ -474,6 +478,7 @@ toNumParser =
       (spaces *> string "toNumber" <* spaces <* string "(" <* spaces)
       (spaces *> string ")" <* spaces)
       astSubParser''
+
 -- | parses a list definition
 listParser :: Parser KittyAST
 listParser =
@@ -483,12 +488,33 @@ listParser =
       (spaces *> string ")" <* spaces)
       (astSubParser'' `sepBy` string ",")
 
+-- | parses pop operation of popping top value off a list
+popParser :: Parser KittyAST
+popParser =
+  Pop
+    <$> between
+      (spaces *> string "pop" <* spaces <* string "(" <* spaces)
+      (spaces *> string ")" <* spaces)
+      astSubParser''
+
+-- | parses push operation of pushing value on top of a list
+pushParser :: Parser KittyAST
+pushParser = do
+  _ <- spaces *> string "push" <* spaces <* string "(" <* spaces
+  val <- astSubParser''
+  _ <- spaces *> char ',' <* spaces
+  l <- astSubParser''
+  _ <- spaces *> string ")" <* spaces
+  return $ Push val l
+
 -- | parses any AST variant
 astParser :: Parser KittyAST
 astParser =
   try printParser
     <|> try toTextParser
     <|> try toNumParser
+    <|> try pushParser
+    <|> try popParser
     <|> try listParser
     <|> try elseParser
     <|> try ifParser
@@ -504,7 +530,7 @@ astParser =
     <|> try falseParser
     <|> try trueParser
     <|> try floatParser
-    <|> try intParser   
+    <|> try intParser
     <|> varParser
 
 astTestParser :: Parser KittyAST
@@ -545,6 +571,9 @@ astSubParser'' :: Parser KittyAST
 astSubParser'' =
   try printParser
     <|> try toTextParser
+    <|> toNumParser
+    <|> pushParser
+    <|> popParser
     <|> try listParser
     <|> try elseParser
     <|> try ifParser
@@ -560,6 +589,7 @@ astSubParser'' =
     <|> try falseParser
     <|> try varParser
 
+astWithOptionalEOL :: Parser KittyAST
 astWithOptionalEOL = do
   expr <- astSubParser''
   _ <- optional endOfLine

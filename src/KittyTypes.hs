@@ -170,6 +170,8 @@ data KittyAST
   | ToText KittyAST
   | ToNum KittyAST
   | List [KittyAST]
+  | Push KittyAST KittyAST
+  | Pop KittyAST
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition
