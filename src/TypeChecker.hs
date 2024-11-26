@@ -334,7 +334,23 @@ instance TypeCheckable KittyAST where
       if all (== t) ts
         then Right $ KList t
         else Left $ TypeError $ "all values in a list must have the same type"
+  typeOf (Push x xs) e = case typeOf xs e of
+    Left typerr -> Left typerr
+    Right (KList KVoid) -> KList <$> typeOf x e
+    Right (KList t) -> case typeOf x e of 
+      Left typeerr -> Left typeerr
+      Right t1 -> 
+        if t == t1 
+          then Right t 
+          else Left $ 
+          TypeError $ 
+          "all values in a list must have the same type, but new value has type "
+          ++ show t1 
+          ++ " and existing List values have type t"
+    _ -> Left $ TypeError $ "push can only be used with lists"
 
+  typeOf (Pop (List xs)) e = typeOf (List xs) e
+  typeOf (Pop _) e = Left $ TypeError $ "pop can only be used with lists"
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
 checkBlockType statements env =

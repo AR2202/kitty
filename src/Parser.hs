@@ -318,6 +318,8 @@ assignmentParser =
                    <|> try floatParser
                    <|> try intParser
                    <|> try listParser
+                   <|> try popParser 
+                   <|> try pushParser
                    <|> varParser
                )
             <* spaces
@@ -428,7 +430,7 @@ varParser =
     rest <- many alphaNum
     let varname = firstChar : rest
     guard (varname `notElem` keywords)
-    void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')'))
+    void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')'))<|> void (lookAhead (char ','))
     void spaces
 
     return $ Variable varname

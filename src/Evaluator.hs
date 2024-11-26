@@ -237,6 +237,17 @@ evalExpression env (ToNum (Variable v)) = case evalVariable v env of
 evalExpression env (ToNum k) = case toNum k of
   Left err -> Left err 
   Right num -> evalExpression env num
+-- evalExpression env (Pop []) need to decide what pop should return
+evalExpression env (Pop (List [])) = Left $ TypeError "can't pop off empty list"
+evalExpression env (Pop (List (x:xs))) = evalExpression env x
+evalExpression env (Pop _) = Left $ TypeError "pop can only be used on list"
+evalExpression env (Push x (List xs)) = case evalExpression env x of 
+  Left err -> Left err 
+  Right xval -> Right $ List (xval:xs)
+evalExpression env (Push x _) = Left $ TypeError "can only push to list"
+-- this case is already handeled by the type checker, 
+-- but adding just to make the pattern matches exhaustive
+
 -- | looking up variable in program environment
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of
