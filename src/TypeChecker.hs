@@ -326,6 +326,7 @@ instance TypeCheckable KittyAST where
             ++ showUnwrapped t
             ++ " can't be printed. Convert to text; only text can be printed"
   typeOf (ToText x) e = Right KString
+  typeOf (ToNum x) e = Right KInt
   typeOf (List xs) e = case (traverse (`typeOf` e) xs) of
     Left typerr -> Left typerr
     Right [] -> Right $ KList KVoid

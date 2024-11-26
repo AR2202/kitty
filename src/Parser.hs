@@ -443,6 +443,7 @@ varParser =
         "endwhile",
         "print",
         "toText",
+        "toNumber",
         "list",
         "true",
         "false",
@@ -466,6 +467,13 @@ toTextParser =
       (spaces *> string ")" <* spaces)
       astSubParser''
 
+toNumParser :: Parser KittyAST
+toNumParser =
+  ToNum
+    <$> between
+      (spaces *> string "toNumber" <* spaces <* string "(" <* spaces)
+      (spaces *> string ")" <* spaces)
+      astSubParser''
 -- | parses a list definition
 listParser :: Parser KittyAST
 listParser =
@@ -480,6 +488,7 @@ astParser :: Parser KittyAST
 astParser =
   try printParser
     <|> try toTextParser
+    <|> try toNumParser
     <|> try listParser
     <|> try elseParser
     <|> try ifParser

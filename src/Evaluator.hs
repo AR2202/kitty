@@ -23,6 +23,8 @@ import KittyTypes
 import Parser
 import Text.Parsec.Error
 import TypeChecker (checkBlockType, initialTypeEnv, typeOf, updateTypeEnv)
+import Foreign.C (errnoToIOError)
+import Text.Read(readMaybe)
 
 {-This is the definition of the evaluation
 a tree-walk interpreter to traverse and execute the AST-}
@@ -227,7 +229,14 @@ evalExpression env (ToText (Variable v)) = case evalVariable v env of
   Left err -> Left err
   Right val -> evalExpression env (toText val)
 evalExpression env (ToText k) = evalExpression env (toText k)
-
+evalExpression env (ToNum (Variable v)) = case evalVariable v env of
+  Left err -> Left err
+  Right val -> case toNum val of
+    Left err -> Left err 
+    Right num -> evalExpression env num
+evalExpression env (ToNum k) = case toNum k of
+  Left err -> Left err 
+  Right num -> evalExpression env num
 -- | looking up variable in program environment
 evalVariable :: String -> Env -> Either KittyError KittyAST
 evalVariable v env = case M.lookup v (_variables env) of
@@ -245,6 +254,13 @@ toText (FloatLit f) = StrLit (show f)
 toText (Letter l) = StrLit [l]
 toText _ = StrLit "not yet implemented"
 
+toNum :: KittyAST -> Either KittyError KittyAST
+toNum (StrLit x) = case readMaybeInt x of
+  Nothing -> Left $ TypeConversionError $ (show x ++ " can't be converted to a whole Number")
+  Just i -> Right $ IntLit i
+
+readMaybeInt :: String -> Maybe Int 
+readMaybeInt = readMaybe
 -- | evaluates the AST and converts the resulting environment to a string
 -- | for debugging
 evalAndPrintEnv :: Env -> KittyAST -> String

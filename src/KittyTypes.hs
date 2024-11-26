@@ -168,6 +168,7 @@ data KittyAST
   | Print KittyAST
   | BuiltIn String
   | ToText KittyAST
+  | ToNum KittyAST
   | List [KittyAST]
   deriving (Show, Eq)
 
@@ -190,6 +191,7 @@ data KittyError
   | ParseError ErrorMsg
   | DoesNotExistError ErrorMsg
   | UndefinedError ErrorMsg
+  | TypeConversionError ErrorMsg
   deriving (Eq)
 
 instance Show KittyError where
@@ -201,7 +203,8 @@ instance Show KittyError where
     "DoesNotExist Error: " ++ msg
   show (UndefinedError msg) =
     "Undefined Error: " ++ msg
-
+  show (TypeConversionError msg) =
+    "Type conversion Error: " ++ msg
 type Defs = M.Map String KittyAST
 
 type FType = M.Map String KType -- should always be KFun
