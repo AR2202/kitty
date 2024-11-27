@@ -52,7 +52,7 @@ parseAddition =
 
 parseParensChangeOrder :: Expectation
 parseParensChangeOrder =
-  parseAsAST " 1 + (2 - 1)"
+  parseAsAST "1 + (2 - 1)"
     `shouldBe` Right (Expr Add (IntLit 1) (Parens (Expr Sub (IntLit 2) (IntLit 1))))
 
 parseParens :: SpecWith ()
@@ -65,7 +65,7 @@ parseParens =
 
 parseParensBeforeTimes :: Expectation
 parseParensBeforeTimes =
-  parseAsAST " 1 * (2 - 1)"
+  parseAsAST "1 * (2 - 1)"
     `shouldBe` Right (Expr Mult (IntLit 1) (Parens (Expr Sub (IntLit 2) (IntLit 1))))
 
 parseParensTimes :: SpecWith ()
@@ -176,7 +176,7 @@ parseBoolOp =
 
 ifInsideWhile :: Expectation
 ifInsideWhile =
-  parseAsAST "while  true do if true then print(2) endif endwhile"
+  parseAsAST "while true do if true then print(2) endif endwhile"
     `shouldBe` Right (While (BoolLit True) [If (BoolLit True) [Print (IntLit 2)]])
 
 parseIfInWhile :: SpecWith ()
@@ -202,7 +202,7 @@ parsePrintInWhile =
 
 ifInsideIf :: Expectation
 ifInsideIf =
-  parseAsAST "if  true  then if true then print(2) endif endif"
+  parseAsAST "if true then if true then print(2) endif endif"
     `shouldBe` Right (If (BoolLit True) [If (BoolLit True) [Print (IntLit 2)]])
 
 parseIfInIf :: SpecWith ()

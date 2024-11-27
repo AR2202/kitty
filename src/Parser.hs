@@ -372,7 +372,7 @@ ifBlockParser =
     ( spaces *> (try (string "endif"))
         <|> (lookAhead (string "else")) <* spaces
     )
-    (many astWithOptionalEOL)
+    (many astSubParser'')
 
 elseBlockParser =
   between
@@ -591,10 +591,10 @@ astSubParser'' :: Parser KittyAST
 astSubParser'' =
   try printParser
     <|> try toTextParser
-    <|> toNumParser
-    <|> pushParser
-    <|> lettersParser
-    <|> popParser
+    <|> try toNumParser
+    <|> try pushParser
+    <|> try lettersParser
+    <|> try popParser
     <|> try listParser
     <|> try elseParser
     <|> try ifParser
@@ -618,14 +618,14 @@ astWithOptionalEOL = do
 
 astEOL = do
   expr <- astParser
-  trace ("Parsed expression: " ++ show expr) (return ())
+  --trace ("Parsed expression: " ++ show expr) (return ())
   eol <- optional endOfLine
-  trace ("Matched EOL: " ++ show eol) (return ())
+  --trace ("Matched EOL: " ++ show eol) (return ())
   return expr
 
 astMultiline = do
   lines <- many astEOL
-  trace ("Parsed lines: " ++ show lines) (return ())
+  --trace ("Parsed lines: " ++ show lines) (return ())
   eof
   return lines
 

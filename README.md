@@ -16,6 +16,8 @@ type in the operation, e.g.:
 
 `3 * (8 + 2) - 4`
 
+`3 % 2`
+
 ### Booleans
 
 currently supported: `and`, `or`, `xor`, `not`.
@@ -125,9 +127,15 @@ you can ask for the type of an expression by prefixing it with the keyword `type
 
 `type 1 + 2`
 
+whole number
+
 `type "hello world"`
 
+text
+
 `type true and false`
+
+truth
 
 `type myvar`
 
@@ -142,4 +150,5 @@ Currently, kitty has the following types:
 * letter (corresponding to char)
 * truth (corresponding to bool)
 * empty (corresponding to void)
+* list of t (where t is a type parameter)
 * oneOf type1 or type2 (a union type of type1 type2; corresponding to, e.g., Either in Haskell or Result in Rust)
