@@ -1,6 +1,6 @@
-fb = 1
+fb = 30
 mylist = list()
-while (fb < 21) do 
+while (fb > 0 ) do 
     if (fb % 15 == 0) 
     then mylist = push("fizzbuzz", mylist) 
     else if (fb % 3 == 0) 
@@ -11,6 +11,6 @@ while (fb < 21) do
             endif 
         endif 
     endif 
-    fb = fb + 1 
+    fb = fb - 1 
 endwhile
 mylist
