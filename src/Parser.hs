@@ -465,6 +465,7 @@ printParser =
       (spaces *> string ")" <* spaces)
       astSubParser''
 
+-- | convert a type to text type
 toTextParser :: Parser KittyAST
 toTextParser =
   ToText
@@ -473,11 +474,21 @@ toTextParser =
       (spaces *> string ")" <* spaces)
       astSubParser''
 
+-- | type conversion from text to number
 toNumParser :: Parser KittyAST
 toNumParser =
   ToNum
     <$> between
       (spaces *> string "toNumber" <* spaces <* string "(" <* spaces)
+      (spaces *> string ")" <* spaces)
+      astSubParser''
+
+-- | convert a text to a list of letters
+lettersParser :: Parser KittyAST
+lettersParser =
+  Letters
+    <$> between
+      (spaces *> string "letters" <* spaces <* string "(" <* spaces)
       (spaces *> string ")" <* spaces)
       astSubParser''
 
@@ -516,6 +527,7 @@ astParser =
     <|> try toTextParser
     <|> try toNumParser
     <|> try pushParser
+    <|> lettersParser
     <|> try popParser
     <|> try listParser
     <|> try elseParser
@@ -575,6 +587,7 @@ astSubParser'' =
     <|> try toTextParser
     <|> toNumParser
     <|> pushParser
+    <|> lettersParser
     <|> popParser
     <|> try listParser
     <|> try elseParser

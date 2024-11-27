@@ -172,6 +172,7 @@ data KittyAST
   | List [KittyAST]
   | Push KittyAST KittyAST
   | Pop KittyAST
+  | Letters KittyAST
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition

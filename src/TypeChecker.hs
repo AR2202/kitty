@@ -351,6 +351,10 @@ instance TypeCheckable KittyAST where
 
   typeOf (Pop (List xs)) e = typeOf (List xs) e
   typeOf (Pop _) e = Left $ TypeError $ "pop can only be used with lists"
+  typeOf (Letters (StrLit cs)) e = Right $ KList KChar
+  typeOf (Letters _) e = Left $ 
+    TypeError $
+   "letters can only be used to convert text to a list of letters"
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
 checkBlockType statements env =

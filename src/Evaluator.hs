@@ -19,12 +19,12 @@ import Data.Foldable (foldl1)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Lazy (toLower)
+import Foreign.C (errnoToIOError)
 import KittyTypes
 import Parser
 import Text.Parsec.Error
+import Text.Read (readMaybe)
 import TypeChecker (checkBlockType, initialTypeEnv, typeOf, updateTypeEnv)
-import Foreign.C (errnoToIOError)
-import Text.Read(readMaybe)
 
 {-This is the definition of the evaluation
 a tree-walk interpreter to traverse and execute the AST-}
@@ -232,21 +232,29 @@ evalExpression env (ToText k) = evalExpression env (toText k)
 evalExpression env (ToNum (Variable v)) = case evalVariable v env of
   Left err -> Left err
   Right val -> case toNum val of
-    Left err -> Left err 
+    Left err -> Left err
     Right num -> evalExpression env num
 evalExpression env (ToNum k) = case toNum k of
-  Left err -> Left err 
+  Left err -> Left err
   Right num -> evalExpression env num
 -- evalExpression env (Pop []) need to decide what pop should return
 evalExpression env (Pop (List [])) = Left $ TypeError "can't pop off empty list"
-evalExpression env (Pop (List (x:xs))) = evalExpression env x
+evalExpression env (Pop (List (x : xs))) = evalExpression env x
 evalExpression env (Pop _) = Left $ TypeError "pop can only be used on list"
-evalExpression env (Push x (List xs)) = case evalExpression env x of 
-  Left err -> Left err 
-  Right xval -> Right $ List (xval:xs)
+evalExpression env (Push x (List xs)) = case evalExpression env x of
+  Left err -> Left err
+  Right xval -> Right $ List (xval : xs)
 evalExpression env (Push x _) = Left $ TypeError "can only push to list"
--- this case is already handeled by the type checker, 
+-- this case is already handeled by the type checker,
 -- but adding just to make the pattern matches exhaustive
+evalExpression env (Letters x) = case evalExpression env x of
+  Right (StrLit cs) -> Right $ List [Letter c | c <- cs]
+  Right _ ->
+    Left $
+      TypeError "letters can only be used to convert text to a list of letters"
+  -- this case is already handeled by the type checker,
+  -- but adding just to make the pattern matches exhaustive
+  Left err -> Left err
 
 -- | looking up variable in program environment
 evalVariable :: String -> Env -> Either KittyError KittyAST
@@ -270,11 +278,13 @@ toNum (StrLit x) = case readMaybeInt x of
   Nothing -> Left $ TypeConversionError $ (show x ++ " can't be converted to a whole Number")
   Just i -> Right $ IntLit i
 toNum (Letter c) = toNum (StrLit [c])
-toNum _ = Left $ TypeError " Only text and letters can be converted to numbers" 
+toNum _ = Left $ TypeError " Only text and letters can be converted to numbers"
+
 -- this should really be done by the type checker
 
-readMaybeInt :: String -> Maybe Int 
+readMaybeInt :: String -> Maybe Int
 readMaybeInt = readMaybe
+
 -- | evaluates the AST and converts the resulting environment to a string
 -- | for debugging
 evalAndPrintEnv :: Env -> KittyAST -> String
