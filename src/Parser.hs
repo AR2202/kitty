@@ -378,7 +378,7 @@ whileBlockParser =
   between
     (spaces *> string "do" <* spaces)
     (spaces *> string "endwhile" <* spaces)
-    (many astSubParser'')
+    (many astWithOptionalEOL)
 
 -- | parse unwrap
 unwrapVarParser =

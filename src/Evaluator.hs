@@ -241,10 +241,13 @@ evalExpression env (ToNum k) = case toNum k of
 evalExpression env (Pop (List [])) = Left $ TypeError "can't pop off empty list"
 evalExpression env (Pop (List (x : xs))) = evalExpression env x
 evalExpression env (Pop _) = Left $ TypeError "pop can only be used on list"
-evalExpression env (Push x (List xs)) = case evalExpression env x of
+evalExpression env (Push x l) = case evalExpression env x of
   Left err -> Left err
-  Right xval -> Right $ List (xval : xs)
-evalExpression env (Push x _) = Left $ TypeError "can only push to list"
+  Right xval -> case evalExpression env l of 
+    Left err -> Left err
+    Right (List xs) -> Right $ List (xval : xs)
+    Right _ -> Left $ TypeError "can only push to list"
+
 -- this case is already handeled by the type checker,
 -- but adding just to make the pattern matches exhaustive
 evalExpression env (Letters x) = case evalExpression env x of
