@@ -1,0 +1,16 @@
+fb = 1
+mylist = list()
+while (fb < 21) do 
+    if (fb % 15 == 0) 
+    then mylist = push("fizzbuzz", mylist) 
+    else if (fb % 3 == 0) 
+        then mylist = push("fizz", mylist) 
+        else if (fb % 5 == 0) 
+            then mylist = push("buzz", mylist) 
+            else mylist = push(toText(fb), mylist) 
+            endif 
+        endif 
+    endif 
+    fb = fb + 1 
+endwhile
+mylist
