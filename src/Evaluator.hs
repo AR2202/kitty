@@ -301,6 +301,7 @@ evalOp Add = add
 evalOp Sub = sub
 evalOp Mult = mult
 evalOp Div = divide
+evalOp Mod = modulo
 
 parseEvalAndPrintEnv :: T.Text -> Either ParseError String
 parseEvalAndPrintEnv text =

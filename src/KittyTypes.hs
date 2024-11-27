@@ -17,6 +17,7 @@ module KittyTypes
     mult,
     toOutput,
     opSymb,
+    modulo
   )
 where
 
@@ -25,6 +26,7 @@ import Data.Char (isSpace, toLower)
 import Data.List (foldl1')
 import qualified Data.Map as M
 import Text.ParserCombinators.ReadP
+import GHC.Float.RealFracMethods(roundFloatInt)
 
 {- This file defines the Types and Values of a kitty programm-}
 
@@ -128,6 +130,7 @@ data Operator
   | Mult
   | Div
   | Sub
+  | Mod
   deriving (Show, Read, Eq)
 
 -- | function and variable definition and assignment
@@ -232,18 +235,21 @@ class ArithOperations a where
   sub :: a -> a -> a
   mult :: a -> a -> a
   divide :: a -> a -> a
+  modulo :: a -> a -> a
 
 instance ArithOperations Float where
   add = (+)
   sub = (-)
   mult = (*)
   divide = (/)
+  modulo = \x y -> fromIntegral (roundFloatInt x `mod` roundFloatInt y)
 
 instance ArithOperations Int where
   add = (+)
   sub = (-)
   mult = (*)
   divide = div
+  modulo = mod
 
 class ProgramOutput a where
   toOutput :: a -> String
@@ -308,3 +314,4 @@ opSymb Add = '+'
 opSymb Mult = '*'
 opSymb Sub = '-'
 opSymb Div = '/'
+opSymb Mod = '%'

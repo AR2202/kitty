@@ -68,6 +68,7 @@ parseWhichOperator '+' = Add
 parseWhichOperator '-' = Sub
 parseWhichOperator '*' = Mult
 parseWhichOperator '/' = Div
+parseWhichOperator '%' = Mod
 
 addop :: Parser (KittyAST -> KittyAST -> KittyAST)
 addop =
@@ -95,6 +96,11 @@ divop =
   Expr Div
     <$ char
       '/'
+modop :: Parser (KittyAST -> KittyAST -> KittyAST)
+modop =
+  Expr Mod
+    <$ char
+      '%'
 
 chainl1' ::
   ParsecT s u m t ->
@@ -113,7 +119,7 @@ chainl1' p op = do
         <|> parserFail "Operator required"
 
 muldiv :: Parser (KittyAST -> KittyAST -> KittyAST)
-muldiv = mulop <|> divop
+muldiv = mulop <|> divop <|> modop
 
 -- | parsing multiplication or division with left association
 mulParser :: Parser KittyAST
