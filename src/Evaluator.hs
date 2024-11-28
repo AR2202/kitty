@@ -42,7 +42,7 @@ evalT env (Print (Variable x)) = do
   liftIO $
     putStrLn $
       toOutput $
-        M.findWithDefault (StrLit "variable not found") x $ --this should not happen
+        M.findWithDefault (StrLit "variable not found") x $ -- this should not happen
           _variables env
   return env
 evalT env (Print (ToText k)) = case evalExpression env (ToText k) of
@@ -51,6 +51,21 @@ evalT env (Print (ToText k)) = case evalExpression env (ToText k) of
 evalT env (Print x) = do
   liftIO $ putStrLn $ toOutput x
   return env
+evalT env (While c e) = case evalExpression env c of
+  Right (BoolLit False) -> ExceptT $ return $ Right env
+  Right (BoolLit True) -> evalMultipleT env e >>= flip evalT (While c e)
+  Left err -> ExceptT $ return $ Left err
+  _ -> ExceptT $ return $ Left $ TypeError "Condition must have type truth"
+evalT env (If b e) = case evalExpression env b of
+  Right (BoolLit False) -> ExceptT $ return $ Right env
+  Right (BoolLit True) -> evalMultipleT env e
+  Left err -> ExceptT $ return $ Left err
+  _ -> ExceptT $ return $ Left $ TypeError "Condition must have type truth"
+evalT env (IfElse b i e) = case evalExpression env b of
+  Right (BoolLit False) -> evalMultipleT env e
+  Right (BoolLit True) -> evalMultipleT env i
+  Left err -> ExceptT $ return $ Left err
+  _ -> ExceptT $ return $ Left $ TypeError "Condition must have type truth"
 evalT env val = ExceptT $ return $ eval env val
 
 -- | the evaluation function
@@ -70,7 +85,7 @@ eval env (If b e) = case evalExpression env b of
   _ -> Left $ TypeError "Condition must have type truth"
 eval env (UnwrapAs vname typename unwrappedName doBlock) =
   case evalExpression env vname of
-    --the value bound to the variable vname has to be retrieved and type-checked
+    -- the value bound to the variable vname has to be retrieved and type-checked
     Left err -> Left err
     Right x -> case typeOf x initialTypeEnv of
       Left err -> Left err
@@ -137,20 +152,20 @@ evalExpression env (BoolLit tf) = Right $ BoolLit tf
 evalExpression env (And b1 b2)
   | evalExpression env b1 == Right (BoolLit True)
       && evalExpression env b2 == Right (BoolLit True) =
-    Right $ BoolLit True
+      Right $ BoolLit True
   | otherwise = Right $ BoolLit False
 evalExpression env (Or b1 b2)
   | evalExpression env b1 == Right (BoolLit True)
       || evalExpression env b2 == Right (BoolLit True) =
-    Right $ BoolLit True
+      Right $ BoolLit True
   | otherwise = Right $ BoolLit False
 evalExpression env (Xor b1 b2)
   | evalExpression env b1 == Right (BoolLit True)
       || evalExpression env b2 == Right (BoolLit False) =
-    Right $ BoolLit True
+      Right $ BoolLit True
   | evalExpression env b1 == Right (BoolLit False)
       || evalExpression env b2 == Right (BoolLit False) =
-    Right $ BoolLit True
+      Right $ BoolLit True
   | otherwise = Right $ BoolLit False
 evalExpression env (Variable v) =
   evalVariable v env
@@ -243,11 +258,10 @@ evalExpression env (Pop (List (x : xs))) = evalExpression env x
 evalExpression env (Pop _) = Left $ TypeError "pop can only be used on list"
 evalExpression env (Push x l) = case evalExpression env x of
   Left err -> Left err
-  Right xval -> case evalExpression env l of 
+  Right xval -> case evalExpression env l of
     Left err -> Left err
     Right (List xs) -> Right $ List (xval : xs)
     Right _ -> Left $ TypeError "can only push to list"
-
 -- this case is already handeled by the type checker,
 -- but adding just to make the pattern matches exhaustive
 evalExpression env (Letters x) = case evalExpression env x of
@@ -346,7 +360,8 @@ evalMultipleExpr env astlist = case evalMultiple env astlist of
 
 parseEvalMultiline :: T.Text -> Either KittyError Env
 parseEvalMultiline text = case traverse parseAsAST $
-  filter (not . T.null) $ T.lines text of
+  filter (not . T.null) $
+    T.lines text of
   Right asts -> case checkBlockType asts initialTypeEnv of
     Left err -> Left err
     _ -> evalMultiple initialEnv asts
@@ -377,7 +392,8 @@ parseEvalTFromFile fname text = case parseAsASTMultiline fname text of
   Left _ ->
     ExceptT $
       return $
-        Left $ KittyTypes.ParseError (T.unpack text)
+        Left $
+          KittyTypes.ParseError (T.unpack text)
 
 -- | parses and evaluates expression entered to REPL
 parseRepl :: Env -> T.Text -> Either KittyError Env
@@ -392,7 +408,8 @@ parseReplT env text = case traverse parseAsAST $ T.lines text of
   Left _ ->
     ExceptT $
       return $
-        Left $ KittyTypes.ParseError (T.unpack text)
+        Left $
+          KittyTypes.ParseError (T.unpack text)
 
 -- | Monad transformer version of parseEvalPrintFromFile
 parseEvalPrintFromFileT :: String -> T.Text -> IO ()
