@@ -78,6 +78,19 @@ eval env (DefType (AssignDef varname vardef)) =
         env
           { _variables = M.insert varname def (_variables env)
           }
+eval env (Pop (Variable varname)) =
+  case evalVariable varname env of
+    Left err -> Left err
+    Right (List []) -> Left $ TypeError "can't pop off empty list"
+    Right (List (x : xs)) -> case evalExpression env x of
+      Left err -> Left err
+      Right listHead ->
+        Right $
+          env
+            { _variables = M.insert varname (List xs) (_variables env),
+              _tmpResult = listHead
+            }
+    Right _ -> Left $ TypeError "pop can only be used on list vars"
 eval env (If b e) = case evalExpression env b of
   Right (BoolLit False) -> Right env
   Right (BoolLit True) -> evalMultiple env e

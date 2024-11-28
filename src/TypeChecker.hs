@@ -350,6 +350,10 @@ instance TypeCheckable KittyAST where
     _ -> Left $ TypeError $ "push can only be used with lists"
 
   typeOf (Pop (List xs)) e = typeOf (List xs) e
+  typeOf (Pop (Variable xs)) e = case typeOf (Variable xs) e of 
+    Left err -> Left err
+    Right (KList x) -> Right (KList x)
+    Right _ -> Left $ TypeError $ "pop can only be used with lists"
   typeOf (Pop _) e = Left $ TypeError $ "pop can only be used with lists"
   typeOf (Letters (StrLit cs)) e = Right $ KList KChar
   typeOf (Letters _) e = Left $ 
