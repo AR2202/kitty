@@ -533,7 +533,7 @@ astParser =
     <|> try toTextParser
     <|> try toNumParser
     <|> try pushParser
-    <|> lettersParser
+    <|> try lettersParser
     <|> try popParser
     <|> try listParser
     <|> try elseParser
