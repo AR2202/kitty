@@ -1,16 +1,15 @@
-fb = 30
-mylist = list()
-while (fb > 0 ) do 
+fb = 1
+
+while (fb < 31 ) do 
     if (fb % 15 == 0) 
-    then mylist = push("fizzbuzz", mylist) 
+    then print("fizzbuzz") 
     else if (fb % 3 == 0) 
-        then mylist = push("fizz", mylist) 
+        then print("fizz") 
         else if (fb % 5 == 0) 
-            then mylist = push("buzz", mylist) 
-            else mylist = push(toText(fb), mylist) 
+            then print("buzz") 
+            else print(toText(fb)) 
             endif 
         endif 
     endif 
-    fb = fb - 1 
+    fb = fb + 1 
 endwhile
-mylist
