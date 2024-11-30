@@ -302,6 +302,7 @@ instance ProgramOutput KittyAST where
   toOutput (While condition loopBody) =
     "if " ++ toOutput condition ++ "\n"
       ++ foldl1 (++) (map ((++) "\n" . toOutput) loopBody)
+  toOutput (List []) = "list ()"
   toOutput (List xs) =
     "list("
       ++ init (foldl1 (++) (map ((++ ",") . toOutput) xs))

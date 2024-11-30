@@ -96,6 +96,7 @@ divop =
   Expr Div
     <$ char
       '/'
+
 modop :: Parser (KittyAST -> KittyAST -> KittyAST)
 modop =
   Expr Mod
@@ -324,7 +325,7 @@ assignmentParser =
                    <|> try floatParser
                    <|> try intParser
                    <|> try listParser
-                   <|> try popParser 
+                   <|> try popParser
                    <|> try pushParser
                    <|> varParser
                )
@@ -364,7 +365,7 @@ whileCondParser =
   between
     (spaces *> string "while" <* spaces)
     (lookAhead (spaces *> string "do" <* spaces))
-    astSubParser --should this be astSubParser''?
+    astSubParser -- should this be astSubParser''?
 
 ifBlockParser =
   between
@@ -436,7 +437,7 @@ varParser =
     rest <- many alphaNum
     let varname = firstChar : rest
     guard (varname `notElem` keywords)
-    void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')'))<|> void (lookAhead (char ','))
+    void space <|> eof <|> void endOfLine <|> void tab <|> void (lookAhead (char ')')) <|> void (lookAhead (char ','))
     void spaces
 
     return $ Variable varname
@@ -535,13 +536,13 @@ astParser =
     <|> try pushParser
     <|> try lettersParser
     <|> try popParser
-    <|> try listParser
     <|> try elseParser
     <|> try ifParser
     <|> try whileParser
     <|> try unwrapParser
     <|> try astAssignParser
     <|> try compParser
+    <|> try listParser
     <|> try addParser
     <|> try mulParser
     <|> try charParser
@@ -565,7 +566,7 @@ astTestParser =
     <|> try stringParser
     <|> try notParser
     <|> try falseParser
-    <|> trueParser
+    <|> try trueParser
     <|> try floatParser
     <|> try intParser
     <|> varParser
@@ -618,14 +619,14 @@ astWithOptionalEOL = do
 
 astEOL = do
   expr <- astParser
-  --trace ("Parsed expression: " ++ show expr) (return ())
+  -- trace ("Parsed expression: " ++ show expr) (return ())
   eol <- optional endOfLine
-  --trace ("Matched EOL: " ++ show eol) (return ())
+  -- trace ("Matched EOL: " ++ show eol) (return ())
   return expr
 
 astMultiline = do
   lines <- many astEOL
-  --trace ("Parsed lines: " ++ show lines) (return ())
+  -- trace ("Parsed lines: " ++ show lines) (return ())
   eof
   return lines
 
@@ -641,6 +642,7 @@ astSubParser' =
     <|> try intParser
     <|> try trueParser
     <|> try falseParser
+    <|> try listParser
     <|> varParser
 
 {- helper function to test parsing in the console-}

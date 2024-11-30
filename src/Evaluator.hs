@@ -229,6 +229,8 @@ evalExpression env (Equal (StrLit i) (StrLit j)) =
   Right $ BoolLit (i == j)
 evalExpression env (Equal (Letter i) (Letter j)) =
   Right $ BoolLit (i == j)
+evalExpression env (Equal (List xs) (List ys)) =
+  Right $ BoolLit (xs == ys)
 evalExpression env (Equal e1 e2) =
   case evalExpression env e1 of
     Left err -> Left err
@@ -243,6 +245,8 @@ evalExpression env (NotEqual (StrLit i) (StrLit j)) =
   Right $ BoolLit (i /= j)
 evalExpression env (NotEqual (Letter i) (Letter j)) =
   Right $ BoolLit (i /= j)
+evalExpression env (NotEqual (List xs) (List ys)) =
+  Right $ BoolLit (xs /= ys)
 evalExpression env (NotEqual e1 e2) = case evalExpression env e1 of
   Left err -> Left err
   Right e -> evalExpression env e2 >>= \x -> evalExpression env (NotEqual e x)
