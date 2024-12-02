@@ -384,8 +384,8 @@ elseBlockParser =
 whileBlockParser =
   between
     (spaces *> string "do" <* spaces)
-    (spaces *> string "endwhile" <* spaces)
-    (many astWithOptionalEOL)
+    (spaces *> (try (string "endwhile")) <* spaces)
+    (many astSubParser'')
 
 -- | parse unwrap
 unwrapVarParser =
@@ -598,7 +598,9 @@ astSubParser'' =
     <|> try popParser
     <|> try listParser
     <|> try elseParser
+    
     <|> try ifParser
+    <|> try whileParser
     <|> try astAssignParser
     <|> try addParser
     <|> try mulParser
@@ -613,7 +615,7 @@ astSubParser'' =
 
 astWithOptionalEOL :: Parser KittyAST
 astWithOptionalEOL = do
-  expr <- astSubParser''
+  expr <- astParser
   _ <- optional endOfLine
   return expr
 

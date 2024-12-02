@@ -271,8 +271,12 @@ evalExpression env (ToNum k) = case toNum k of
   Right num -> evalExpression env num
 -- evalExpression env (Pop []) need to decide what pop should return
 evalExpression env (Pop (List [])) = Left $ TypeError "can't pop off empty list"
-evalExpression env (Pop (List (x : xs))) = evalExpression env x
-evalExpression env (Pop _) = Left $ TypeError "pop can only be used on list"
+evalExpression env (Pop l) = case evalExpression env l of
+    Left err -> Left err
+    Right (List (x:xs)) -> evalExpression env x
+    Right (List []) -> Left $ TypeError "can't pop off empty list"
+    Right _ -> Left $ TypeError "can only push to list"
+
 evalExpression env (Push x l) = case evalExpression env x of
   Left err -> Left err
   Right xval -> case evalExpression env l of

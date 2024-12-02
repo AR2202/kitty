@@ -341,7 +341,7 @@ instance TypeCheckable KittyAST where
       Left typeerr -> Left typeerr
       Right t1 -> 
         if t == t1 
-          then Right t 
+          then Right $ KList t 
           else Left $ 
           TypeError $ 
           "all values in a list must have the same type, but new value has type "
@@ -349,10 +349,11 @@ instance TypeCheckable KittyAST where
           ++ " and existing List values have type t"
     _ -> Left $ TypeError $ "push can only be used with lists"
 
-  typeOf (Pop (List xs)) e = typeOf (List xs) e
+  typeOf (Pop (List [])) e = Right KVoid
+  typeOf (Pop (List (x:xs))) e = typeOf x e
   typeOf (Pop (Variable xs)) e = case typeOf (Variable xs) e of 
     Left err -> Left err
-    Right (KList x) -> Right (KList x)
+    Right (KList x) -> Right  x
     Right _ -> Left $ TypeError $ "pop can only be used with lists"
   typeOf (Pop _) e = Left $ TypeError $ "pop can only be used with lists"
   typeOf (Letters (StrLit cs)) e = Right $ KList KChar
