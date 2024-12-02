@@ -56,11 +56,11 @@ while (list1sorted =/= emptyNumlist) do
     pop(list1sorted)
     j = pop(list2sorted)
     pop(list2sorted)
-    sumNum = i - j 
-    if (sumNum < 0)
-        then sumNum =  -1 * sumNum
+    diff = i - j 
+    if (diff < 0)
+        then diff =  -1 * diff
     endif 
-    sum = sum + sumNum
+    sum = sum + diff
 endwhile
 print("Day 1 example Part 1:")
 print(toText(sum))
