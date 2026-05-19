@@ -1,295 +1,311 @@
 
   ---
   Kitty Type Checker: Improvement Plan
-
-  Overview
-
-  The type checker lives in TypeChecker.hs and implements a typeOf :: t -> TypeEnv -> Either KittyError KType interface.
-  It's structurally sound, but has four categories of problems:
-
-  1. Correctness bugs — built-ins accept wrong types silently
-  2. Missing coverage — several AST nodes return "not yet implemented"
-  3. Weak OneOf handling — union unification has workarounds and no exhaustiveness check
-  4. No function type checking — the biggest missing feature
-
-  I'll go through each in order of priority, from easiest to hardest, with concrete before/after code examples.
+  (updated to reflect current state of codebase)
 
   ---
-  1. Fix Built-in Input Validation (Correctness Bugs)
+  Completed
 
-  ToText — currently ignores its input type
+  The following items from the original plan have been implemented:
 
-  TypeChecker.hs:328 just returns Right KString unconditionally:
-
-  -- Current (wrong)
-  typeOf (ToText _) _ = Right KString
-
-  This means toText(true and false) or toText([1, 2, 3]) would type-check even though those conversions don't make sense or
-   aren't implemented. The fix is to check that the inner expression is a type that has a defined text representation:
-
-  -- Proposed
-  typeOf (ToText inner) env = do
-    t <- typeOf inner env
-    case t of
-      KInt    -> Right KString
-      KFloat  -> Right KString
-      KBool   -> Right KString
-      KChar   -> Right KString
-      KString -> Right KString   -- identity, but still valid
-      other   -> Left $ TypeError
-        ("toText only works on wholeNumber, decimalNumber, truth, letter, or text — got "
-         <> show other)
-
-  ToNum — same issue
-
-  -- Current
-  typeOf (ToNum _) _ = Right KInt
-
-  -- Proposed
-  typeOf (ToNum inner) env = do
-    t <- typeOf inner env
-    case t of
-      KString -> Right KInt
-      other   -> Left $ TypeError
-        ("toNumber only works on text — got " <> show other)
-
-  Letters — only works on StrLit, not on variables
-
-  TypeChecker.hs:359-362:
-
-  -- Current
-  typeOf (Letters (StrLit _)) _ = Right (KList KChar)
-  typeOf (Letters other) _      = Left $ TypeError "..."
-
-  This means let x = "hello" then letters(x) fails type checking even though x is a KString. Fix:
-
-  -- Proposed
-  typeOf (Letters inner) env = do
-    t <- typeOf inner env
-    case t of
-      KString -> Right (KList KChar)
-      other   -> Left $ TypeError
-        ("letters only works on text — got " <> show other)
-
-  Pop — doesn't validate the input is a list
-
-  TypeChecker.hs:352-358 pattern matches on KList t but doesn't emit a useful error if the input isn't a list:
-
-  -- Current (partial match — runtime error in Haskell if non-list reaches here)
-  typeOf (Pop inner) env =
-    case typeOf inner env of
-      Right (KList t) -> Right t
-      ...
-
-  -- Proposed
-  typeOf (Pop inner) env = do
-    t <- typeOf inner env
-    case t of
-      KList KVoid -> Left $ TypeError "cannot pop from an empty list"
-      KList elem  -> Right elem
-      other       -> Left $ TypeError
-        ("pop requires a list — got " <> show other)
+  - ToText now validates that its input is a convertible type (KInt, KFloat, KBool, KChar, KString)
+  - ToNum now validates that its input is KString; dead unreachable fallthrough case removed
+  - Letters now accepts any expression of type KString, not just string literals
+  - Pop rewritten to reason about the result type rather than the AST shape;
+    handles all list expressions, not just literals and bare variables
+  - Push error message now correctly interpolates the existing list element type
+  - UnwrapAs now narrows the unwrapped variable to wantedType inside the block
+  - Suspicious unused imports removed (Control.Exception, Foreign.C, etc.)
+  - BuiltIn removed from KittyAST entirely
 
   ---
-  2. Fix the Push Bug
-
-  There's an existing variable name shadowing bug at TypeChecker.hs:349. In the branch that checks a push onto an existing
-  typed list, the code refers to t when it should refer to the element type of the list (call it elemT). A naming-clean
-  version:
-
-  -- Proposed (clarified variable names)
-  typeOf (Push val list) env = do
-    valType  <- typeOf val env
-    listType <- typeOf list env
-    case listType of
-      KList KVoid  -> Right (KList valType)   -- pushing into empty list fixes its type
-      KList elemT  ->
-        if valType == elemT
-          then Right (KList elemT)
-          else Left $ TypeError
-            ("cannot push " <> show valType <>
-             " into a list of " <> show elemT)
-      other -> Left $ TypeError
-        ("push requires a list — got " <> show other)
+  Outstanding Issues
 
   ---
-  3. Strengthen OneOf / UnwrapAs
+  1. Two remaining unused imports — TypeChecker.hs (Trivial)
 
-  Current exhaustiveness gap
+  The bulk of the suspicious imports have been removed, but two stale ones remain:
 
-  UnwrapAs (TypeChecker.hs:252-278) only handles the branch for the specified type, but there's no check that the block
-  actually covers both variants. For example:
+    import Control.Monad (foldM, void)   -- void is unused; foldM is used
+    import Data.Bits (Bits (xor))        -- unused; "xor" in the file is only a string literal
 
-  let x = ...       -- x : OneOf wholeNumber text
-  unwrap x as wholeNumber named n andDo
-    print(toText(n))
-  endunwrap
+  Both should be trimmed: remove void from the Control.Monad import and remove the
+  Data.Bits import entirely.
 
-  This currently type-checks fine — but there's no enforcement that you must handle the text case too. Whether you want
-  exhaustiveness (force both) or not is a design decision, but the type checker should at minimum correctly narrow the type
-   of the unwrapped variable inside the block.
+  ---
+  2. unifyTypeEnvs workaround still in place — TypeChecker.hs (Medium)
 
-  Narrowing bug: currently uses the declared type, not the narrowed type
+  The current implementation:
 
-  In UnwrapAs, when checking the block body, the correct thing is to insert n with the narrowed type (the one you declared
-  in the as clause):
+    unifyTypeEnvs tenv1 tenv2 =
+      tenv1
+        { _varTypes =
+            M.map (unwrapOneOfIfEqual . oneOfVoidIfMissing) $
+              M.unionWith OneOf (_varTypes tenv1) (_varTypes tenv2)
+        }
 
-  -- Proposed (explicit narrowing)
-  typeOf (UnwrapAs expr wantedType name block) env = do
-    t <- typeOf expr env
-    case t of
-      OneOf a b ->
-        if wantedType == a || wantedType == b
-          then do
-            let narrowedEnv = insertVar name wantedType env
-            checkBlockType block narrowedEnv
-          else Left $ TypeError
-            ("cannot unwrap as " <> show wantedType <>
-             " — type is " <> show t)
-      other -> Left $ TypeError
-        ("unwrap requires a OneOf type — got " <> show other)
+  M.unionWith OneOf creates OneOf t t when both branches assign the same type to
+  a variable, and unwrapOneOfIfEqual then cleans it up. This works correctly but
+  is convoluted. A cleaner approach avoids creating the bad OneOf in the first place:
 
-  unwrapOneOfIfEqual is a symptom, not a cause
+    unifyTypeEnvs envA envB =
+      TypeEnv
+        { _functionTypes = Map.unionWith unifyFuns (_functionTypes envA) (_functionTypes envB)
+        , _varTypes      = Map.unionWith unifyVars (_varTypes envA) (_varTypes envB)
+        }
+      where
+        unifyVars a b
+          | a == b    = a          -- same type: no wrapping needed
+          | otherwise = OneOf a b  -- different: create union
 
-  The helper at line 453 (unwrapOneOfIfEqual) exists to clean up OneOf t t that the if/else unifier creates. A cleaner
-  approach is to prevent the bad OneOf from being created in the first place in unifyTypeEnvs:
+  ---
+  3. Function definition and call type checking — (Hard, blocked on KittyTypes)
 
-  -- Proposed unifyTypeEnvs (simplified)
-  unifyTypeEnvs :: TypeEnv -> TypeEnv -> TypeEnv
-  unifyTypeEnvs envA envB =
-    TypeEnv
-      { _functionTypes = Map.unionWith unifyFuns (_functionTypes envA) (_functionTypes envB)
-      , _varTypes      = Map.unionWith unifyVars (_varTypes envA) (_varTypes envB)
+  The type checker returns "not yet implemented" for both function definitions and
+  calls. This cannot be properly fixed in the type checker alone — the data types
+  in KittyTypes.hs do not carry enough information:
+
+    -- call args are variable names only, not expressions
+    data FunctionCall = FunctionCall String [String]
+
+    -- no parameter types, no return type
+    data FunctionDefinition = FunctionDefinition
+      { _funcName   :: String
+      , _funcParams :: [String]
+      , _funcBody   :: [KittyAST]
       }
-    where
-      unifyVars a b
-        | a == b    = a                    -- same type: no wrapping needed
-        | otherwise = OneOf a b            -- different: create union
+
+  Required changes to KittyTypes.hs first:
+
+    data FunctionCall = FunctionCall String [KittyAST]  -- args as expressions
+
+    data FunctionDefinition = FunctionDefinition
+      { _funcName    :: String
+      , _funcParams  :: [(String, KType)]  -- names with types
+      , _funcRetType :: KType              -- declared return type
+      , _funcBody    :: [KittyAST]
+      }
+
+  Once KittyTypes is updated, the type checker logic:
+
+  For definitions — register the KFun type, build a local env with params in scope,
+  check the body, verify the return type matches:
+
+    typeOf (DefType (FunctionDef (FunctionDefinition name params retType body))) env = do
+      let paramEnv = foldl (\e (n, t) -> e {_varTypes = M.insert n t (_varTypes e)}) env params
+      bodyType <- checkBlockType body paramEnv
+      if bodyType == retType
+        then Right KVoid
+        else Left $ TypeError
+          ("function " <> name <> " declares return type " <> show retType <>
+           " but body has type " <> show bodyType)
+
+  For calls — look up the function type, check argument count and types:
+
+    typeOf (Call (FunctionCall name args)) env = do
+      funType <- case M.lookup name (_functionTypes env) of
+        Nothing -> Left $ UndefinedError ("no function named " ++ name)
+        Just t  -> Right t
+      case funType of
+        KFun (paramTypes, [retType]) -> do
+          argTypes <- mapM (`typeOf` env) args
+          if length argTypes /= length paramTypes
+            then Left $ TypeError ("wrong number of arguments to " ++ name)
+            else case filter (\(g,e) -> g /= e) (zip argTypes paramTypes) of
+              []          -> Right retType
+              (got,ex):_ -> Left $ TypeError
+                ("argument type mismatch in call to " ++ name ++
+                 ": expected " ++ show ex ++ " but got " ++ show got)
+        _ -> Left $ TypeError (name ++ " is not a function")
+
+  This change also requires parser support for function definition syntax and
+  typed parameter lists.
+
+  Note: explicit type annotations on parameters means Hindley-Milner is not
+  needed for this step. See the HM section below for when it becomes necessary.
 
   ---
-  4. Function Definition Type Checking
+  4. Double parsing in the REPL — REPL.hs (Medium)
 
-  This is the biggest gap. The plan has two parts: (a) a type-checker-side design that works independently of the parser,
-  and (b) what changes the parser would need.
+  The interactive REPL path parses the input text twice: once inside updateTypeEnv
+  and again inside parseReplT. The type checker and evaluator see independent parse
+  results rather than the same AST object.
 
-  Type checker design
+  Parsec is deterministic so both parses always produce the same AST, making this
+  an architectural smell rather than a current bug. The fix is to parse once and
+  thread the resulting AST through both the type checker and evaluator.
 
-  A function definition needs to:
-  1. Register the function's KFun ([argTypes], [returnTypes]) in the function type environment
-  2. Type-check the body with a new scope that includes the parameter variables
-  3. Verify the body's return type matches the declared return type
+  This is structurally enforced by the Typed AST pattern (see design section below).
 
-  -- Example: what function definition type checking would look like
-  typeOf (DefType (FunctionDefinition name params returnType body)) env = do
-    -- Build a local env with parameters in scope
-    let paramEnv = foldl (\e (pName, pType) -> insertVar pName pType e) env params
-    -- Type-check the body
-    bodyType <- checkBlockType body paramEnv
-    -- Verify return type
-    if bodyType == returnType
-      then do
-        let funType = KFun (map snd params, [returnType])
-        Right KVoid   -- the definition itself produces no value
-      else Left $ TypeError
-        ("function " <> name <> " declares return type " <> show returnType <>
-         " but body has type " <> show bodyType)
+  ---
+  5. evalFile command uses empty type environment — REPL.hs line 54 (Low)
 
-  And for function calls:
+  The evalFile command type-checks against initialTypeEnv (the empty environment),
+  not the current session's tenv. A file cannot reference variables defined in the
+  REPL session, and after the file runs, the REPL continues with its old state —
+  nothing from the file persists.
 
-  typeOf (Call (FunctionCall name args)) env = do
-    funType <- lookupFun name env    -- look up in _functionTypes
-    case funType of
-      KFun (paramTypes, [retType]) -> do
-        -- Check argument count
-        when (length args /= length paramTypes) $
-          Left $ TypeError ("wrong number of arguments to " <> name)
-        -- Check each argument type
-        argTypes <- mapM (\a -> typeOf a env) args
-        zipWithM_ (\got expected ->
-          when (got /= expected) $
-            Left $ TypeError ("argument type mismatch in call to " <> name <>
-                              ": expected " <> show expected <> " got " <> show got)
-          ) argTypes paramTypes
-        Right retType
-      other -> Left $ TypeError (name <> " is not a function")
+  This may be intentional isolation, but is worth a conscious decision.
+
+  ---
+  6. Exported evaluator functions bypass type checking — Evaluator.hs (Low)
+
+  Several exported functions skip the type checker entirely:
+
+    parseEvalAndPrintEnv    -- Evaluator.hs:341
+    parseEvalAndPrintResult -- Evaluator.hs:346
+    parseRepl               -- Evaluator.hs:421
+
+  None are called from the main REPL flow, but they are exported and could be
+  called from tests or future code without realising they are unguarded. They
+  should either be removed or have a type-check step added.
 
   ---
   Prioritized Roadmap
 
-  ┌──────────┬────────────────────────────────────────────┬────────────┬─────────────┐
-  │ Priority │                   Change                   │ Difficulty │   Impact    │
-  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
-  │ 1        │ Fix Letters to accept KString variables    │ Trivial    │ Bug fix     │
-  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
-  │ 2        │ Add input validation to ToText, ToNum      │ Easy       │ Correctness │
-  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
-  │ 3        │ Fix Pop missing-list error                 │ Easy       │ Correctness │
-  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
-  │ 4        │ Fix Push variable shadowing bug (line 349) │ Easy       │ Bug fix     │
-  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
-  │ 5        │ Fix OneOf creation in unifyTypeEnvs        │ Medium     │ Cleanliness │
-  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
-  │ 6        │ Fix UnwrapAs narrowing                     │ Medium     │ Correctness │
-  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
-  │ 7        │ Function definition + call type checking   │ Hard       │ New feature │
-  └──────────┴────────────────────────────────────────────┴────────────┴─────────────┘
-
- ---
-  The Push bug — a string interpolation mistake (line 352)
-
-  Look at the error message in the branch where you're pushing a value of the wrong type:
-
-  -- TypeChecker.hs:340-353
-  typeOf (Push x xs) e = case typeOf xs e of
-    ...
-    Right (KList t) -> case typeOf x e of
-      Left typeerr -> Left typeerr
-      Right t1 ->
-        if t == t1
-          then Right $ KList t
-          else Left $
-            TypeError $
-              "all values in a list must have the same type, but new value has type "
-              ++ show t1
-              ++ " and existing List values have type t"   -- <-- bug here
-
-  The last line ends with the literal string "type t". The variable t (which holds the actual list element type) is
-  never interpolated — it's just the letter t in the string. So if you try to push a KBool into a KList KInt, the error
-  would read:
-
-  all values in a list must have the same type, but new value has type truth
-  and existing List values have type t      ← should say "wholeNumber"
-
-  The fix is:
-  ++ " and existing List values have type " ++ show t
+  Priority  Change                                        Difficulty
+  --------  --------------------------------------------  ----------
+  1         Remove two remaining stale imports            Trivial
+  2         Fix unifyTypeEnvs to avoid OneOf t t          Medium
+  3         Fix double parsing in the REPL               Medium
+  4         Decide on evalFile session isolation          Low
+  5         Guard or remove unguarded evaluator exports  Low
+  6         Function definition + call type checking     Hard (needs KittyTypes changes first)
 
   ---
-  The Pop bug — pattern matching on structure instead of type
+  Design notes — for reference
 
-  This one is more subtle. The type checker has three separate cases for Pop:
+  ---
+  Does adding functions require Hindley-Milner?
 
-  -- TypeChecker.hs:355-361
-  typeOf (Pop (List []))     e = Right KVoid
-  typeOf (Pop (List (x:xs))) e = typeOf x e
-  typeOf (Pop (Variable xs)) e = case typeOf (Variable xs) e of ...
-  typeOf (Pop _)             e = Left $ TypeError "pop can only be used with lists"
+  Not necessarily — it depends on whether you require annotations.
 
-  Instead of asking "what type does the inner expression have?", it asks "what shape is the inner AST node?". That means
-   Pop only works if you write it with a literal list or a bare variable name. Any other expression that produces a list
-   — even a simple one — hits the catch-all and fails:
+  If function parameters have declared types, monomorphic functions are entirely
+  tractable with the current architecture:
 
-  pop(push(1, [2, 3]))   -- fails: inner node is Push, not List or Variable
-  pop([1, 2, 3])          -- works: inner node is List
-  pop(myList)             -- works: inner node is Variable
+    define add(x: wholeNumber, y: wholeNumber) -> wholeNumber
+      x + y
+    enddefine
 
-  The fix is to collapse all four cases into one that just type-checks the inner expression and inspects the resulting
-  type:
+  Type-checking this requires no new machinery. Extend TypeEnv with the parameter
+  types, check the body, verify the last expression matches the declared return type.
 
-  typeOf (Pop inner) e = case typeOf inner e of
-    Left err          -> Left err
-    Right (KList KVoid) -> Left $ TypeError "cannot pop from an empty list"
-    Right (KList t)   -> Right t
-    Right other       -> Left $ TypeError ("pop can only be used with lists, not " ++ show other)
+  Where you hit a wall is if you want to infer parameter types without annotations:
 
-  This works correctly for all three situations — literal lists, variables, and any computed list expression — because
-  it reasons about the type rather than the syntax.
+    define add(x, y)
+      x + y     -- what are x and y?
+    enddefine
+
+  Here you see x + y and know both must be numeric and equal, but you can't determine
+  which numeric type from the body alone. You'd need constraint solving — the core of HM.
+
+  So: annotated monomorphic functions do not need HM. Unannotated functions do.
+
+  ---
+  When does HM become truly necessary?
+
+  1. Polymorphic functions — the canonical HM use case.
+
+    define identity(x)
+      x
+    endidentify
+
+    With monomorphic inference, identity can only ever have one concrete type. With
+    HM's let-generalisation, it gets the type ∀a. a → a. Without HM, you cannot
+    write a generic identity, head, map, or filter.
+
+  2. Type parameters on data structures
+
+    define first(xs: List of T) -> T
+
+    You need type variables (T here), requiring unification to check that the T in
+    the argument and the T in the return type refer to the same thing.
+
+  3. Type class constraints
+
+    define sort(xs: List of T) -> List of T   -- T must be orderable
+
+    This requires HM extended with constraints — roughly what Haskell's type system is.
+
+  Short answer: annotated functions → no HM needed. Polymorphism → HM is the standard
+  path. For Kitty targeting children, explicitly annotated functions are probably the
+  right call, deferring HM for a long time.
+
+  ---
+  Alternative designs worth knowing about
+
+  Bidirectional type checking
+
+  Rather than one typeOf (inference only), two modes:
+
+    infer :: KittyAST -> TypeEnv -> Either KittyError KType
+    check :: KittyAST -> KType -> TypeEnv -> Either KittyError ()
+
+  infer produces a type bottom-up (current approach). check takes an expected type
+  and verifies the expression against it — flowing information top-down. The two
+  modes call each other.
+
+  Used by Rust, Swift, and Kotlin. Produces significantly better error messages than
+  HM because you always know what type was expected at the point of failure. Requires
+  annotations at certain boundaries (function parameters), which for a pedagogical
+  language is arguably a feature — it makes types visible to learners.
+
+  Typed AST
+
+  Instead of typeOf returning a KType separately, the type checker transforms the AST
+  into one where every node carries its type:
+
+    data AST a
+      = IntLit Int
+      | Expr Operator (AST a) (AST a)
+      | Variable String
+      | ...
+      deriving Functor
+
+    type UntypedAST = AST ()
+    type TypedAST   = AST KType
+
+    typeCheck :: UntypedAST -> TypeEnv -> Either KittyError TypedAST
+
+  Benefits for Kitty:
+  - The evaluator can read the type off any node without re-running the type checker
+  - It is impossible to accidentally pass an unchecked AST to the evaluator —
+    the types enforce the pipeline and eliminate the double-parsing smell
+  - Error messages become easier because you always have the type of every
+    sub-expression to hand
+
+  The cost is a heavier refactor: every AST case in the type checker has to construct
+  a typed node rather than just return a KType. This is the direction production
+  compilers (including GHC) go.
+
+  Constraint-based inference (the HM implementation strategy)
+
+  Separate the type checker into two phases:
+
+    -- Phase 1: walk AST, emit constraints between type variables
+    generate :: UntypedAST -> State FreshVars ([Constraint], TypeVar)
+
+    -- Phase 2: solve constraints by unification
+    solve :: [Constraint] -> Either KittyError Substitution
+
+    -- Phase 3: apply substitution to get concrete types
+    apply :: Substitution -> TypeVar -> KType
+
+  A Constraint is an assertion that two types must be equal: TypeVar 3 ~ KInt.
+  This architecture makes it easy to give good error messages and is how most HM
+  implementations work in practice.
+
+  ---
+  Recommendation for Kitty
+
+  1. Add functions with explicit type annotations on parameters and return type.
+     This requires no new theory — just extend the type environment with parameter
+     types and check the body. Requires KittyTypes and parser changes first.
+
+  2. Hold off on HM. Polymorphism is conceptually tricky for beginners anyway.
+
+  3. Consider bidirectional checking as a medium-term upgrade for better error messages.
+
+  4. Consider the Typed AST pattern when tidying the evaluator-type checker pipeline.
+     It enforces that the evaluator only ever sees type-checked code and eliminates
+     the double-parsing smell structurally.

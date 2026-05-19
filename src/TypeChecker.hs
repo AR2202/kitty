@@ -12,14 +12,13 @@ module TypeChecker
 where
 
 
-import Control.Monad (foldM, void)
-import Data.Bits (Bits (xor))
+import Control.Monad (foldM)
+
 
 import qualified Data.Map as M
 import qualified Data.Text as T
 
 import KittyTypes
-import KittyTypes (KittyAST, KittyError)
 import Parser
 
 {-This is the type checker of the kitty language-}
