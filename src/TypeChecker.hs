@@ -11,14 +11,13 @@ module TypeChecker
   )
 where
 
-import Control.Exception (TypeError)
-import Control.Exception.Base (typeError)
+
 import Control.Monad (foldM, void)
 import Data.Bits (Bits (xor))
-import Data.Functor.Contravariant (Comparison)
+
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Foreign.C (eNODEV)
+
 import KittyTypes
 import KittyTypes (KittyAST, KittyError)
 import Parser
@@ -329,7 +328,7 @@ instance TypeCheckable KittyAST where
       KString -> Right KInt
       other   -> Left $ TypeError
         ("toNumber only works on text — got " <> show other)
-  typeOf (ToNum x) e = Right KInt
+
   typeOf (List xs) e = case (traverse (`typeOf` e) xs) of
     Left typerr -> Left typerr
     Right [] -> Right $ KList KVoid
