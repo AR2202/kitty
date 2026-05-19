@@ -1,0 +1,295 @@
+
+  ---
+  Kitty Type Checker: Improvement Plan
+
+  Overview
+
+  The type checker lives in TypeChecker.hs and implements a typeOf :: t -> TypeEnv -> Either KittyError KType interface.
+  It's structurally sound, but has four categories of problems:
+
+  1. Correctness bugs — built-ins accept wrong types silently
+  2. Missing coverage — several AST nodes return "not yet implemented"
+  3. Weak OneOf handling — union unification has workarounds and no exhaustiveness check
+  4. No function type checking — the biggest missing feature
+
+  I'll go through each in order of priority, from easiest to hardest, with concrete before/after code examples.
+
+  ---
+  1. Fix Built-in Input Validation (Correctness Bugs)
+
+  ToText — currently ignores its input type
+
+  TypeChecker.hs:328 just returns Right KString unconditionally:
+
+  -- Current (wrong)
+  typeOf (ToText _) _ = Right KString
+
+  This means toText(true and false) or toText([1, 2, 3]) would type-check even though those conversions don't make sense or
+   aren't implemented. The fix is to check that the inner expression is a type that has a defined text representation:
+
+  -- Proposed
+  typeOf (ToText inner) env = do
+    t <- typeOf inner env
+    case t of
+      KInt    -> Right KString
+      KFloat  -> Right KString
+      KBool   -> Right KString
+      KChar   -> Right KString
+      KString -> Right KString   -- identity, but still valid
+      other   -> Left $ TypeError
+        ("toText only works on wholeNumber, decimalNumber, truth, letter, or text — got "
+         <> show other)
+
+  ToNum — same issue
+
+  -- Current
+  typeOf (ToNum _) _ = Right KInt
+
+  -- Proposed
+  typeOf (ToNum inner) env = do
+    t <- typeOf inner env
+    case t of
+      KString -> Right KInt
+      other   -> Left $ TypeError
+        ("toNumber only works on text — got " <> show other)
+
+  Letters — only works on StrLit, not on variables
+
+  TypeChecker.hs:359-362:
+
+  -- Current
+  typeOf (Letters (StrLit _)) _ = Right (KList KChar)
+  typeOf (Letters other) _      = Left $ TypeError "..."
+
+  This means let x = "hello" then letters(x) fails type checking even though x is a KString. Fix:
+
+  -- Proposed
+  typeOf (Letters inner) env = do
+    t <- typeOf inner env
+    case t of
+      KString -> Right (KList KChar)
+      other   -> Left $ TypeError
+        ("letters only works on text — got " <> show other)
+
+  Pop — doesn't validate the input is a list
+
+  TypeChecker.hs:352-358 pattern matches on KList t but doesn't emit a useful error if the input isn't a list:
+
+  -- Current (partial match — runtime error in Haskell if non-list reaches here)
+  typeOf (Pop inner) env =
+    case typeOf inner env of
+      Right (KList t) -> Right t
+      ...
+
+  -- Proposed
+  typeOf (Pop inner) env = do
+    t <- typeOf inner env
+    case t of
+      KList KVoid -> Left $ TypeError "cannot pop from an empty list"
+      KList elem  -> Right elem
+      other       -> Left $ TypeError
+        ("pop requires a list — got " <> show other)
+
+  ---
+  2. Fix the Push Bug
+
+  There's an existing variable name shadowing bug at TypeChecker.hs:349. In the branch that checks a push onto an existing
+  typed list, the code refers to t when it should refer to the element type of the list (call it elemT). A naming-clean
+  version:
+
+  -- Proposed (clarified variable names)
+  typeOf (Push val list) env = do
+    valType  <- typeOf val env
+    listType <- typeOf list env
+    case listType of
+      KList KVoid  -> Right (KList valType)   -- pushing into empty list fixes its type
+      KList elemT  ->
+        if valType == elemT
+          then Right (KList elemT)
+          else Left $ TypeError
+            ("cannot push " <> show valType <>
+             " into a list of " <> show elemT)
+      other -> Left $ TypeError
+        ("push requires a list — got " <> show other)
+
+  ---
+  3. Strengthen OneOf / UnwrapAs
+
+  Current exhaustiveness gap
+
+  UnwrapAs (TypeChecker.hs:252-278) only handles the branch for the specified type, but there's no check that the block
+  actually covers both variants. For example:
+
+  let x = ...       -- x : OneOf wholeNumber text
+  unwrap x as wholeNumber named n andDo
+    print(toText(n))
+  endunwrap
+
+  This currently type-checks fine — but there's no enforcement that you must handle the text case too. Whether you want
+  exhaustiveness (force both) or not is a design decision, but the type checker should at minimum correctly narrow the type
+   of the unwrapped variable inside the block.
+
+  Narrowing bug: currently uses the declared type, not the narrowed type
+
+  In UnwrapAs, when checking the block body, the correct thing is to insert n with the narrowed type (the one you declared
+  in the as clause):
+
+  -- Proposed (explicit narrowing)
+  typeOf (UnwrapAs expr wantedType name block) env = do
+    t <- typeOf expr env
+    case t of
+      OneOf a b ->
+        if wantedType == a || wantedType == b
+          then do
+            let narrowedEnv = insertVar name wantedType env
+            checkBlockType block narrowedEnv
+          else Left $ TypeError
+            ("cannot unwrap as " <> show wantedType <>
+             " — type is " <> show t)
+      other -> Left $ TypeError
+        ("unwrap requires a OneOf type — got " <> show other)
+
+  unwrapOneOfIfEqual is a symptom, not a cause
+
+  The helper at line 453 (unwrapOneOfIfEqual) exists to clean up OneOf t t that the if/else unifier creates. A cleaner
+  approach is to prevent the bad OneOf from being created in the first place in unifyTypeEnvs:
+
+  -- Proposed unifyTypeEnvs (simplified)
+  unifyTypeEnvs :: TypeEnv -> TypeEnv -> TypeEnv
+  unifyTypeEnvs envA envB =
+    TypeEnv
+      { _functionTypes = Map.unionWith unifyFuns (_functionTypes envA) (_functionTypes envB)
+      , _varTypes      = Map.unionWith unifyVars (_varTypes envA) (_varTypes envB)
+      }
+    where
+      unifyVars a b
+        | a == b    = a                    -- same type: no wrapping needed
+        | otherwise = OneOf a b            -- different: create union
+
+  ---
+  4. Function Definition Type Checking
+
+  This is the biggest gap. The plan has two parts: (a) a type-checker-side design that works independently of the parser,
+  and (b) what changes the parser would need.
+
+  Type checker design
+
+  A function definition needs to:
+  1. Register the function's KFun ([argTypes], [returnTypes]) in the function type environment
+  2. Type-check the body with a new scope that includes the parameter variables
+  3. Verify the body's return type matches the declared return type
+
+  -- Example: what function definition type checking would look like
+  typeOf (DefType (FunctionDefinition name params returnType body)) env = do
+    -- Build a local env with parameters in scope
+    let paramEnv = foldl (\e (pName, pType) -> insertVar pName pType e) env params
+    -- Type-check the body
+    bodyType <- checkBlockType body paramEnv
+    -- Verify return type
+    if bodyType == returnType
+      then do
+        let funType = KFun (map snd params, [returnType])
+        Right KVoid   -- the definition itself produces no value
+      else Left $ TypeError
+        ("function " <> name <> " declares return type " <> show returnType <>
+         " but body has type " <> show bodyType)
+
+  And for function calls:
+
+  typeOf (Call (FunctionCall name args)) env = do
+    funType <- lookupFun name env    -- look up in _functionTypes
+    case funType of
+      KFun (paramTypes, [retType]) -> do
+        -- Check argument count
+        when (length args /= length paramTypes) $
+          Left $ TypeError ("wrong number of arguments to " <> name)
+        -- Check each argument type
+        argTypes <- mapM (\a -> typeOf a env) args
+        zipWithM_ (\got expected ->
+          when (got /= expected) $
+            Left $ TypeError ("argument type mismatch in call to " <> name <>
+                              ": expected " <> show expected <> " got " <> show got)
+          ) argTypes paramTypes
+        Right retType
+      other -> Left $ TypeError (name <> " is not a function")
+
+  ---
+  Prioritized Roadmap
+
+  ┌──────────┬────────────────────────────────────────────┬────────────┬─────────────┐
+  │ Priority │                   Change                   │ Difficulty │   Impact    │
+  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
+  │ 1        │ Fix Letters to accept KString variables    │ Trivial    │ Bug fix     │
+  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
+  │ 2        │ Add input validation to ToText, ToNum      │ Easy       │ Correctness │
+  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
+  │ 3        │ Fix Pop missing-list error                 │ Easy       │ Correctness │
+  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
+  │ 4        │ Fix Push variable shadowing bug (line 349) │ Easy       │ Bug fix     │
+  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
+  │ 5        │ Fix OneOf creation in unifyTypeEnvs        │ Medium     │ Cleanliness │
+  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
+  │ 6        │ Fix UnwrapAs narrowing                     │ Medium     │ Correctness │
+  ├──────────┼────────────────────────────────────────────┼────────────┼─────────────┤
+  │ 7        │ Function definition + call type checking   │ Hard       │ New feature │
+  └──────────┴────────────────────────────────────────────┴────────────┴─────────────┘
+
+ ---
+  The Push bug — a string interpolation mistake (line 352)
+
+  Look at the error message in the branch where you're pushing a value of the wrong type:
+
+  -- TypeChecker.hs:340-353
+  typeOf (Push x xs) e = case typeOf xs e of
+    ...
+    Right (KList t) -> case typeOf x e of
+      Left typeerr -> Left typeerr
+      Right t1 ->
+        if t == t1
+          then Right $ KList t
+          else Left $
+            TypeError $
+              "all values in a list must have the same type, but new value has type "
+              ++ show t1
+              ++ " and existing List values have type t"   -- <-- bug here
+
+  The last line ends with the literal string "type t". The variable t (which holds the actual list element type) is
+  never interpolated — it's just the letter t in the string. So if you try to push a KBool into a KList KInt, the error
+  would read:
+
+  all values in a list must have the same type, but new value has type truth
+  and existing List values have type t      ← should say "wholeNumber"
+
+  The fix is:
+  ++ " and existing List values have type " ++ show t
+
+  ---
+  The Pop bug — pattern matching on structure instead of type
+
+  This one is more subtle. The type checker has three separate cases for Pop:
+
+  -- TypeChecker.hs:355-361
+  typeOf (Pop (List []))     e = Right KVoid
+  typeOf (Pop (List (x:xs))) e = typeOf x e
+  typeOf (Pop (Variable xs)) e = case typeOf (Variable xs) e of ...
+  typeOf (Pop _)             e = Left $ TypeError "pop can only be used with lists"
+
+  Instead of asking "what type does the inner expression have?", it asks "what shape is the inner AST node?". That means
+   Pop only works if you write it with a literal list or a bare variable name. Any other expression that produces a list
+   — even a simple one — hits the catch-all and fails:
+
+  pop(push(1, [2, 3]))   -- fails: inner node is Push, not List or Variable
+  pop([1, 2, 3])          -- works: inner node is List
+  pop(myList)             -- works: inner node is Variable
+
+  The fix is to collapse all four cases into one that just type-checks the inner expression and inspects the resulting
+  type:
+
+  typeOf (Pop inner) e = case typeOf inner e of
+    Left err          -> Left err
+    Right (KList KVoid) -> Left $ TypeError "cannot pop from an empty list"
+    Right (KList t)   -> Right t
+    Right other       -> Left $ TypeError ("pop can only be used with lists, not " ++ show other)
+
+  This works correctly for all three situations — literal lists, variables, and any computed list expression — because
+  it reasons about the type rather than the syntax.

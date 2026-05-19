@@ -249,33 +249,19 @@ instance TypeCheckable KittyAST where
         case foldM updateTypeEnv' env statements of
           Left err -> Left err
           Right env' -> typeOf (last statements) env'
-  typeOf (UnwrapAs vname typename unwrappedName doBlock) env =
-    case typeOf vname env of
-      Right (OneOf x y) ->
-        if (typename == x) || (typename == y)
-          then
-            checkBlockType
-              doBlock
-              ( env
-                  { _varTypes = M.insert unwrappedName typename (_varTypes env)
-                  }
-              )
-          else
-            Left $
-              TypeError
-                ( "One of "
-                    ++ show x
-                    ++ " and "
-                    ++ show y
-                    ++ " can't be unwrapped to "
-                    ++ show typename
-                )
-      _ ->
-        Left $
-          TypeError $
-            "trying to unwrap a value of type "
-              ++ showUnwrapped (typeOf vname env)
-              ++ "; only One of type can be unwrapped"
+  typeOf (UnwrapAs expr wantedType name block) env = do
+    t <- typeOf expr env
+    case t of
+      OneOf a b ->
+        if wantedType == a || wantedType == b
+          then do
+            let narrowedEnv = env {_varTypes = M.insert name wantedType (_varTypes env)}
+            checkBlockType block narrowedEnv
+          else Left $ TypeError
+            ("cannot unwrap as " <> show wantedType <>
+             " — type is " <> show t)
+      other -> Left $ TypeError
+        ("unwrap requires a OneOf type — got " <> show other)
   typeOf (While condition whileblock) env
     | typeOf condition env /= Right KBool =
       Left $
@@ -325,7 +311,24 @@ instance TypeCheckable KittyAST where
           "value of type "
             ++ showUnwrapped t
             ++ " can't be printed. Convert to text; only text can be printed"
-  typeOf (ToText x) e = Right KString
+  typeOf (ToText inner) env = do
+    t <- typeOf inner env
+    case t of
+      KInt    -> Right KString
+      KFloat  -> Right KString
+      KBool   -> Right KString
+      KChar   -> Right KString
+      KString -> Right KString   -- identity, but still valid
+      other   -> Left $ TypeError
+        ("toText only works on wholeNumber, decimalNumber, truth, letter, or text — got "
+         <> show other)
+
+  typeOf (ToNum inner) env = do
+    t <- typeOf inner env
+    case t of
+      KString -> Right KInt
+      other   -> Left $ TypeError
+        ("toNumber only works on text — got " <> show other)
   typeOf (ToNum x) e = Right KInt
   typeOf (List xs) e = case (traverse (`typeOf` e) xs) of
     Left typerr -> Left typerr
@@ -346,20 +349,20 @@ instance TypeCheckable KittyAST where
           TypeError $ 
           "all values in a list must have the same type, but new value has type "
           ++ show t1 
-          ++ " and existing List values have type t"
+          ++ " and existing List values have type " ++ show t
     _ -> Left $ TypeError $ "push can only be used with lists"
 
-  typeOf (Pop (List [])) e = Right KVoid
-  typeOf (Pop (List (x:xs))) e = typeOf x e
-  typeOf (Pop (Variable xs)) e = case typeOf (Variable xs) e of 
-    Left err -> Left err
-    Right (KList x) -> Right  x
-    Right _ -> Left $ TypeError $ "pop can only be used with lists"
-  typeOf (Pop _) e = Left $ TypeError $ "pop can only be used with lists"
-  typeOf (Letters (StrLit cs)) e = Right $ KList KChar
-  typeOf (Letters _) e = Left $ 
-    TypeError $
-   "letters can only be used to convert text to a list of letters"
+  typeOf (Pop inner) e = case typeOf inner e of
+    Left err          -> Left err
+    Right (KList KVoid) -> Left $ TypeError "cannot pop from an empty list"
+    Right (KList t)   -> Right t
+    Right other       -> Left $ TypeError ("pop can only be used with lists, not " ++ show other)
+  typeOf (Letters inner) env = do
+    t <- typeOf inner env
+    case t of
+      KString -> Right (KList KChar)
+      other   -> Left $ TypeError
+        ("letters only works on text — got " <> show other)
 checkBlockType :: [KittyAST] -> TypeEnv -> Either KittyError KType
 checkBlockType [] _ = Right KVoid
 checkBlockType statements env =
