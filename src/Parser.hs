@@ -129,6 +129,7 @@ mulParser =
     ( try parensParser
         <|> try floatParser
         <|> try intParser
+        <|> try callParser
         <|> varParser
     )
     muldiv
@@ -146,6 +147,7 @@ addParser =
         <|> try intParser
         <|> try stringParser
         <|> try charParser
+        <|> try callParser
         <|> varParser
     )
     addsub
@@ -194,7 +196,7 @@ falseParser =
 notParser :: Parser KittyAST
 notParser =
   Not
-    <$> (spaces *> string "not" *> spaces *> astSubParser)
+    <$> (spaces *> string "not" *> notFollowedBy alphaNum *> spaces *> astSubParser)
 
 andop :: Parser (KittyAST -> KittyAST -> KittyAST)
 andop =
@@ -232,6 +234,7 @@ boolopParser =
         <|> try notParser
         <|> try falseParser
         <|> try trueParser
+        <|> try callParser
         <|> varParser
     )
     boolop
@@ -327,6 +330,7 @@ assignmentParser =
                    <|> try listParser
                    <|> try popParser
                    <|> try pushParser
+                   <|> try callParser
                    <|> varParser
                )
             <* spaces
@@ -441,8 +445,8 @@ varParser =
     void spaces
 
     return $ Variable varname
-  where
-    keywords =
+
+keywords =
       [ "if",
         "else",
         "endif",
@@ -461,7 +465,11 @@ varParser =
         "or",
         "and",
         "push",
-        "pop"
+        "pop",
+        "function",
+        "endfunction",
+        "defined",
+        "as"
       ]
 
 printParser :: Parser KittyAST
@@ -527,6 +535,54 @@ pushParser = do
   _ <- spaces *> string ")" <* spaces
   return $ Push val l
 
+-- | parses a function parameter
+paramParser :: Parser (String, KType)
+paramParser = do
+  void spaces
+  name <- many1 alphaNum
+  void $ spaces *> char ':' <* spaces
+  t <- typeParser
+  return (name, t)
+
+-- | parses a function Definition
+funcDefParser :: Parser Definition
+funcDefParser = do
+  void $ spaces *> string "function" <* spaces
+  name <- many1 alphaNum
+  params <-
+    between
+      (spaces *> char '(' <* spaces)
+      (spaces *> char ')' <* spaces)
+      (paramParser `sepBy` (spaces *> char ',' <* spaces))
+  void $ spaces *> string "->" <* spaces
+  retType <- typeParser
+  body <-
+    between
+      (spaces *> string "defined" *> spaces *> string "as" <* spaces)
+      (spaces *> string "endfunction" <* spaces)
+      (many astSubParser'')
+  return $ FunctionDef (FunctionDefinition name params retType body)
+
+-- | parses the function definition variant of the KittyAST
+astFuncDefParser :: Parser KittyAST
+astFuncDefParser = DefType <$> funcDefParser
+
+-- | parses a function call
+-- | this is mutually recursive with astSubParser''
+-- | which is fine due to laziness in Haskell
+callParser :: Parser KittyAST
+callParser = do
+  void spaces
+  name <- many1 alphaNum
+  guard (name `notElem` keywords)
+  args <-
+    between
+      (spaces *> char '(' <* spaces)
+      (spaces *> char ')' <* spaces)
+      (astSubParser'' `sepBy` (spaces *> char ',' <* spaces))
+  void spaces
+  return $ Call (FunctionCall name args)
+
 -- | parses any AST variant
 astParser :: Parser KittyAST
 astParser =
@@ -540,6 +596,7 @@ astParser =
     <|> try ifParser
     <|> try whileParser
     <|> try unwrapParser
+    <|> try astFuncDefParser
     <|> try astAssignParser
     <|> try compParser
     <|> try listParser
@@ -552,6 +609,7 @@ astParser =
     <|> try trueParser
     <|> try floatParser
     <|> try intParser
+    <|> try callParser
     <|> varParser
 
 astTestParser :: Parser KittyAST
@@ -586,6 +644,7 @@ astSubParser =
     <|> try intParser
     <|> try trueParser
     <|> try falseParser
+    <|> try callParser
     <|> varParser
 
 astSubParser'' :: Parser KittyAST
@@ -598,7 +657,7 @@ astSubParser'' =
     <|> try popParser
     <|> try listParser
     <|> try elseParser
-    
+    <|> try astFuncDefParser
     <|> try ifParser
     <|> try whileParser
     <|> try astAssignParser
@@ -611,6 +670,7 @@ astSubParser'' =
     <|> try intParser
     <|> try trueParser
     <|> try falseParser
+    <|> try callParser
     <|> try varParser
 
 astWithOptionalEOL :: Parser KittyAST
@@ -645,6 +705,7 @@ astSubParser' =
     <|> try trueParser
     <|> try falseParser
     <|> try listParser
+    <|> try callParser
     <|> varParser
 
 {- helper function to test parsing in the console-}

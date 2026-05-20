@@ -30,6 +30,20 @@ main = hspec $
     parseNumInsidePrint
     parseStrInsidePrint
     parseCharInsidePrint
+    -- Parse function definitions
+    parseFuncDefSimple
+    parseFuncDefTwoParams
+    parseFuncDefNoParams
+    parseFuncDefMultiStatement
+    parseFuncDefKeywordPrefix
+    -- Parse function calls
+    parseFuncCallNoArgs
+    parseFuncCallOneArg
+    parseFuncCallMultipleArgs
+    parseFuncCallExprArg
+    parseFuncCallInExpr
+    parseFuncCallInAssignment
+    parseFuncCallKeywordPrefix
     -- Type Checker---
     ------------------
     typeCheckCharInsidePrint
@@ -268,6 +282,162 @@ parseCharInsidePrint =
       it
         "should parse it as Print (Letter x)"
         charInsidePrint
+
+----Parse function definitions-------
+
+funcDefSimple :: Expectation
+funcDefSimple =
+  parseAsAST "function double(x:wholeNumber) -> wholeNumber defined as x * 2 endfunction"
+    `shouldBe` Right (DefType (FunctionDef (FunctionDefinition
+      "double" [("x", KInt)] KInt [Expr Mult (Variable "x") (IntLit 2)])))
+
+parseFuncDefSimple :: SpecWith ()
+parseFuncDefSimple =
+  describe "parseAsAST" $
+    context "when parsing a function definition with one parameter" $
+      it "should return a FunctionDef with the correct name, params, return type, and body"
+        funcDefSimple
+
+funcDefTwoParams :: Expectation
+funcDefTwoParams =
+  parseAsAST "function add(x:wholeNumber, y:wholeNumber) -> wholeNumber defined as x + y endfunction"
+    `shouldBe` Right (DefType (FunctionDef (FunctionDefinition
+      "add" [("x", KInt), ("y", KInt)] KInt [Expr Add (Variable "x") (Variable "y")])))
+
+parseFuncDefTwoParams :: SpecWith ()
+parseFuncDefTwoParams =
+  describe "parseAsAST" $
+    context "when parsing a function definition with two parameters" $
+      it "should parse both parameters correctly"
+        funcDefTwoParams
+
+funcDefNoParams :: Expectation
+funcDefNoParams =
+  parseAsAST "function greet() -> empty defined as print(\"hello\") endfunction"
+    `shouldBe` Right (DefType (FunctionDef (FunctionDefinition
+      "greet" [] KVoid [Print (StrLit "hello")])))
+
+parseFuncDefNoParams :: SpecWith ()
+parseFuncDefNoParams =
+  describe "parseAsAST" $
+    context "when parsing a function definition with no parameters and void return" $
+      it "should parse an empty parameter list correctly"
+        funcDefNoParams
+
+funcDefMultiStatement :: Expectation
+funcDefMultiStatement =
+  parseAsAST "function addOne(x:wholeNumber) -> wholeNumber defined as y = x + 1 y endfunction"
+    `shouldBe` Right (DefType (FunctionDef (FunctionDefinition
+      "addOne" [("x", KInt)] KInt
+      [ DefType (AssignDef "y" (Expr Add (Variable "x") (IntLit 1)))
+      , Variable "y"
+      ])))
+
+parseFuncDefMultiStatement :: SpecWith ()
+parseFuncDefMultiStatement =
+  describe "parseAsAST" $
+    context "when parsing a function definition with multiple statements in the body" $
+      it "should parse all body statements"
+        funcDefMultiStatement
+
+funcDefKeywordPrefix :: Expectation
+funcDefKeywordPrefix =
+  parseAsAST "function truefun(x:wholeNumber) -> wholeNumber defined as x endfunction"
+    `shouldBe` Right (DefType (FunctionDef (FunctionDefinition
+      "truefun" [("x", KInt)] KInt [Variable "x"])))
+
+parseFuncDefKeywordPrefix :: SpecWith ()
+parseFuncDefKeywordPrefix =
+  describe "parseAsAST" $
+    context "when parsing a function whose name starts with a keyword prefix" $
+      it "should not confuse the name with the keyword"
+        funcDefKeywordPrefix
+
+----Parse function calls--------------
+
+funcCallNoArgs :: Expectation
+funcCallNoArgs =
+  parseAsAST "greet()"
+    `shouldBe` Right (Call (FunctionCall "greet" []))
+
+parseFuncCallNoArgs :: SpecWith ()
+parseFuncCallNoArgs =
+  describe "parseAsAST" $
+    context "when parsing a function call with no arguments" $
+      it "should return a Call with an empty argument list"
+        funcCallNoArgs
+
+funcCallOneArg :: Expectation
+funcCallOneArg =
+  parseAsAST "double(5)"
+    `shouldBe` Right (Call (FunctionCall "double" [IntLit 5]))
+
+parseFuncCallOneArg :: SpecWith ()
+parseFuncCallOneArg =
+  describe "parseAsAST" $
+    context "when parsing a function call with one argument" $
+      it "should return a Call with the argument"
+        funcCallOneArg
+
+funcCallMultipleArgs :: Expectation
+funcCallMultipleArgs =
+  parseAsAST "add(1, 2)"
+    `shouldBe` Right (Call (FunctionCall "add" [IntLit 1, IntLit 2]))
+
+parseFuncCallMultipleArgs :: SpecWith ()
+parseFuncCallMultipleArgs =
+  describe "parseAsAST" $
+    context "when parsing a function call with multiple arguments" $
+      it "should return a Call with all arguments"
+        funcCallMultipleArgs
+
+parseCallExprArg :: Expectation
+parseCallExprArg =
+  parseAsAST "double(1 + 2)"
+    `shouldBe` Right (Call (FunctionCall "double" [Expr Add (IntLit 1) (IntLit 2)]))
+
+parseFuncCallExprArg :: SpecWith ()
+parseFuncCallExprArg =
+  describe "parseAsAST" $
+    context "when parsing a function call with an expression as an argument" $
+      it "should parse the argument expression"
+        parseCallExprArg
+
+funcCallInExpr :: Expectation
+funcCallInExpr =
+  parseAsAST "double(x) + 1"
+    `shouldBe` Right (Expr Add (Call (FunctionCall "double" [Variable "x"])) (IntLit 1))
+
+parseFuncCallInExpr :: SpecWith ()
+parseFuncCallInExpr =
+  describe "parseAsAST" $
+    context "when a function call appears inside an arithmetic expression" $
+      it "should parse the call as an operand"
+        funcCallInExpr
+
+funcCallInAssignment :: Expectation
+funcCallInAssignment =
+  parseAsAST "result = double(5)"
+    `shouldBe` Right (DefType (AssignDef "result" (Call (FunctionCall "double" [IntLit 5]))))
+
+parseFuncCallInAssignment :: SpecWith ()
+parseFuncCallInAssignment =
+  describe "parseAsAST" $
+    context "when a function call appears on the right-hand side of an assignment" $
+      it "should parse the call as the assigned value"
+        funcCallInAssignment
+
+funcCallKeywordPrefix :: Expectation
+funcCallKeywordPrefix =
+  parseAsAST "notafunction(1)"
+    `shouldBe` Right (Call (FunctionCall "notafunction" [IntLit 1]))
+
+parseFuncCallKeywordPrefix :: SpecWith ()
+parseFuncCallKeywordPrefix =
+  describe "parseAsAST" $
+    context "when parsing a function call whose name starts with a keyword prefix" $
+      it "should not confuse the name with the keyword"
+        funcCallKeywordPrefix
 
 ----Type Checking-------------------
 charInsidePrintType :: Expectation

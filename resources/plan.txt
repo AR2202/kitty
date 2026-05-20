@@ -237,3 +237,155 @@
   4. Consider the Typed AST pattern when tidying the evaluator-type checker pipeline.
      It enforces that the evaluator only ever sees type-checked code and eliminates
      the double-parsing smell structurally.
+
+
+---
+  Suggested Syntax
+
+  Following the existing keyword-delimited block pattern (if...then...endif, while...do...endwhile):
+
+  fun add(x:wholeNumber, y:wholeNumber) -> wholeNumber then
+      result = x + y
+      result
+  endfun
+
+  Function calls mirror the existing built-ins (print(...), toText(...)):
+
+  add(2, 3)
+
+  The last expression in the body is the return value — matching how checkBlockType already works at
+  TypeChecker.hs:314-319.
+
+  ---
+  Implementation Steps
+
+  1. paramParser — parse a single name:type pair
+
+  paramParser :: Parser (String, KType)
+  paramParser = do
+    void spaces
+    name <- many1 alphaNum
+    void $ spaces *> char ':' <* spaces
+    t <- typeParser
+    return (name, t)
+
+  2. funcDefParser — parse a full function definition
+
+  funcDefParser :: Parser Definition
+  funcDefParser = do
+    void $ spaces *> string "fun" <* spaces
+    name <- many1 alphaNum
+    params <- between
+      (spaces *> char '(' <* spaces)
+      (spaces *> char ')' <* spaces)
+      (paramParser `sepBy` (spaces *> char ',' <* spaces))
+    void $ spaces *> string "->" <* spaces
+    retType <- typeParser
+    body <- between
+      (spaces *> string "then" <* spaces)
+      (spaces *> string "endfun" <* spaces)
+      (many astSubParser'')
+    return $ FunctionDef (FunctionDefinition name params retType body)
+
+  astFuncDefParser :: Parser KittyAST
+  astFuncDefParser = DefType <$> funcDefParser
+
+  Using then/endfun avoids any conflict with do (already used by while).
+
+  3. callParser — parse a function call
+
+  callParser :: Parser KittyAST
+  callParser = do
+    void spaces
+    name <- many1 alphaNum
+    args <- between
+      (spaces *> char '(' <* spaces)
+      (spaces *> char ')' <* spaces)
+      (astSubParser'' `sepBy` (spaces *> char ',' <* spaces))
+    void spaces
+    return $ Call (FunctionCall name args)
+
+  This is mutually recursive with astSubParser'' (call args can contain calls), which is fine in Haskell's lazy
+  evaluation.
+
+  4. Add fun and endfun to the keywords list in varParser (Parser.hs:445)
+
+  keywords =
+    [ "if", "else", "endif", "then", "endfun",   -- add endfun
+      "fun",                                       -- add fun
+      "endunwrap", "andDo", "do", "while",
+      "endwhile", "print", "toText", "toNumber",
+      "list", "true", "false", "or", "and",
+      "push", "pop"
+    ]
+
+  5. Integration into the parser combinators
+
+  In astParser (Parser.hs:531) and astSubParser'' (Parser.hs:591), add both new parsers. callParser must come before
+  varParser since both start with many1 alphaNum — try will backtrack if ( doesn't follow:
+
+  -- in astParser / astSubParser'' (before try varParser):
+  <|> try astFuncDefParser
+  <|> try callParser
+
+  In addParser and mulParser, add try callParser before varParser so calls work in expressions:
+
+  -- addParser (Parser.hs:138), mulParser (Parser.hs:126):
+  <|> try callParser
+
+  ---
+  The One Tricky Part
+
+  callParser and varParser are ambiguous on the first token. The trick is that callParser requires ( immediately after
+  the name, so try callParser will consume nothing on failure and fall through to varParser. This is the same pattern
+  used for try greaterop vs try greaterEqop in compParser.
+
+   ---
+  Function Parsing Implementation Plan
+
+  Agreed syntax:
+  function add(x:wholeNumber, y:wholeNumber) -> wholeNumber defined as
+      result = x + y
+      result
+  endfunction
+
+  ---
+  Step 1 — paramParser
+
+  Parse a single name:type pair from the parameter list. No changes from original.
+
+  paramParser :: Parser (String, KType)
+
+  ---
+  Step 2 — funcDefParser
+
+  Parse the full function definition. Key change: string "fun" → string "function", body delimited by string "defined"
+  *> spaces *> string "as" and string "endfunction".
+
+  funcDefParser :: Parser Definition
+  astFuncDefParser :: Parser KittyAST  -- wraps in DefType
+
+  ---
+  Step 3 — callParser
+
+  No change from original — name(arg1, arg2) syntax is unchanged.
+
+  callParser :: Parser KittyAST
+
+  ---
+  Step 4 — Update varParser keywords list
+
+  Add "function", "endfunction", and "defined" to prevent them being parsed as variable names. "as" is already
+  implicitly reserved by unwrapParser but not in the list — leave that as existing behaviour.
+
+  ---
+  Step 5 — Integration into parser combinators
+
+  Add try astFuncDefParser and try callParser to astParser, astSubParser'', addParser, and mulParser. Both must come
+  before try varParser since they all begin with many1 alphaNum.
+
+  ---
+  Step 6 — Export new test helpers (optional)
+
+  Add parseFunctionDef and parseCall to the module exports for testing, following the existing parseAsIf, parseIfBlock
+  pattern.
