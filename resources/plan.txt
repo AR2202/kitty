@@ -1,37 +1,8 @@
 
   ---
   Kitty Type Checker: Improvement Plan
-  (updated to reflect current state of codebase)
-
-  ---
-  Completed
-
-  The following items from the original plan have been implemented:
-
-  - ToText now validates that its input is a convertible type (KInt, KFloat, KBool, KChar, KString)
-  - ToNum now validates that its input is KString; dead unreachable fallthrough case removed
-  - Letters now accepts any expression of type KString, not just string literals
-  - Pop rewritten to reason about the result type rather than the AST shape;
-    handles all list expressions, not just literals and bare variables
-  - Push error message now correctly interpolates the existing list element type
-  - UnwrapAs now narrows the unwrapped variable to wantedType inside the block
-  - Suspicious unused imports removed (Control.Exception, Foreign.C, etc.)
-  - BuiltIn removed from KittyAST entirely
-
-  ---
-  Outstanding Issues
-
-  ---
-  1. Two remaining unused imports — TypeChecker.hs (Trivial)
-
-  The bulk of the suspicious imports have been removed, but two stale ones remain:
-
-    import Control.Monad (foldM, void)   -- void is unused; foldM is used
-    import Data.Bits (Bits (xor))        -- unused; "xor" in the file is only a string literal
-
-  Both should be trimmed: remove void from the Control.Monad import and remove the
-  Data.Bits import entirely.
-
+  
+  
   ---
   2. unifyTypeEnvs workaround still in place — TypeChecker.hs (Medium)
 

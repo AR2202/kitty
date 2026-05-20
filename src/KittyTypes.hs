@@ -139,7 +139,7 @@ data Definition
   | FunctionDef FunctionDefinition
   deriving (Show, Eq)
 
-data FunctionCall = FunctionCall String [String] deriving (Show, Eq)
+
 
 -- | AST Variants
 data KittyAST
@@ -178,11 +178,14 @@ data KittyAST
   deriving (Show, Eq)
 
 data FunctionDefinition = FunctionDefinition
-  { _funcName :: String,
-    _funcParams :: [String],
-    _funcBody :: [KittyAST]
-  }
+      { _funcName    :: String
+      , _funcParams  :: [(String, KType)]  -- names with types
+      , _funcRetType :: KType              -- declared return type
+      , _funcBody    :: [KittyAST]
+      }
   deriving (Show, Eq)
+
+data FunctionCall = FunctionCall String [KittyAST]  deriving (Show, Eq)
 
 type ErrorMsg = String
 

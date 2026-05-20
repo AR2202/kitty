@@ -297,7 +297,7 @@ boolInsidePrintType =
   typeOf (Print (BoolLit True)) initialTypeEnv
     `shouldBe` ( Left $
                    TypeError $
-                     "truth value can't be printed; please convert ot text"
+                     "I can't print a truth value directly. Try: print(toText(yourValue))"
                )
 
 typeCheckBoolInsidePrint :: SpecWith ()
@@ -314,7 +314,7 @@ andInsidePrintType =
   typeOf (Print (And (BoolLit True) (BoolLit False))) initialTypeEnv
     `shouldBe` ( Left $
                    TypeError $
-                     "value of type truth can't be printed. Convert to text; only text can be printed"
+                     "I can't print a truth. Only text and letters can be printed. Try wrapping it with toText()."
                )
 
 typeCheckAndInsidePrint :: SpecWith ()
