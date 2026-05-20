@@ -7,6 +7,7 @@ import Test.Hspec
 import Test.QuickCheck
 import Text.Parsec.Error
 import TypeChecker
+import qualified Data.Map as M
 
 main :: IO ()
 main = hspec $
@@ -36,6 +37,22 @@ main = hspec $
     typeCheckBoolInsidePrint
     typeCheckAndInsidePrint
     typeCheckStrInsideParensPrint
+    -- Function definitions
+    typeCheckFuncDefHappyPath
+    typeCheckFuncDefParamsInScope
+    typeCheckFuncDefReturnMismatch
+    typeCheckFuncDefUnknownVar
+    typeCheckFuncDefWrongTypeInBody
+    typeCheckFuncDefEmptyBodyVoid
+    typeCheckFuncDefEmptyBodyMismatch
+    -- Function calls
+    typeCheckFuncCallHappyPath
+    typeCheckFuncCallExprArg
+    typeCheckFuncCallMultipleParams
+    typeCheckFuncCallWrongArgType
+    typeCheckFuncCallTooFewArgs
+    typeCheckFuncCallTooManyArgs
+    typeCheckFuncCallUndefined
 
 parseAdd :: Expectation
 parseAdd =
@@ -324,3 +341,208 @@ typeCheckAndInsidePrint =
       it
         "should fail with Type Error"
         andInsidePrintType
+
+----Function type checking-----------
+
+-- | Environments pre-populated with functions for call tests
+envWithDouble :: TypeEnv
+envWithDouble = TypeEnv
+  { _functionTypes = M.fromList [("double", KFun ([KInt], [KInt]))]
+  , _varTypes = M.empty
+  }
+
+envWithAdd :: TypeEnv
+envWithAdd = TypeEnv
+  { _functionTypes = M.fromList [("add", KFun ([KInt, KInt], [KInt]))]
+  , _varTypes = M.empty
+  }
+
+-- Definition tests
+
+funcDefHappyPath :: Expectation
+funcDefHappyPath =
+  typeOf
+    (DefType (FunctionDef (FunctionDefinition
+      "double" [("x", KInt)] KInt
+      [Expr Mult (Variable "x") (IntLit 2)])))
+    initialTypeEnv
+    `shouldBe` Right KVoid
+
+typeCheckFuncDefHappyPath :: SpecWith ()
+typeCheckFuncDefHappyPath =
+  describe "typeOf" $
+    context "when type checking a function definition with a matching return type" $
+      it "should succeed with KVoid" funcDefHappyPath
+
+funcDefParamsInScope :: Expectation
+funcDefParamsInScope =
+  typeOf
+    (DefType (FunctionDef (FunctionDefinition
+      "addOne" [("x", KInt)] KInt
+      [Expr Add (Variable "x") (IntLit 1)])))
+    initialTypeEnv
+    `shouldBe` Right KVoid
+
+typeCheckFuncDefParamsInScope :: SpecWith ()
+typeCheckFuncDefParamsInScope =
+  describe "typeOf" $
+    context "when type checking a function body that uses its parameters" $
+      it "should have parameters in scope" funcDefParamsInScope
+
+funcDefReturnMismatch :: Expectation
+funcDefReturnMismatch =
+  typeOf
+    (DefType (FunctionDef (FunctionDefinition
+      "bad" [("x", KInt)] KBool
+      [Variable "x"])))
+    initialTypeEnv
+    `shouldBe` Left (TypeError
+      "The function 'bad' says it returns a truth, but the body gives back a wholeNumber.")
+
+typeCheckFuncDefReturnMismatch :: SpecWith ()
+typeCheckFuncDefReturnMismatch =
+  describe "typeOf" $
+    context "when a function body type doesn't match the declared return type" $
+      it "should fail with a type error" funcDefReturnMismatch
+
+funcDefUnknownVar :: Expectation
+funcDefUnknownVar =
+  typeOf
+    (DefType (FunctionDef (FunctionDefinition
+      "bad" [("x", KInt)] KInt
+      [Variable "y"])))
+    initialTypeEnv
+    `shouldBe` Left (DoesNotExistError
+      "I don't know what y is — did you forget to create it?")
+
+typeCheckFuncDefUnknownVar :: SpecWith ()
+typeCheckFuncDefUnknownVar =
+  describe "typeOf" $
+    context "when a function body uses a variable that isn't a parameter" $
+      it "should fail with a does not exist error" funcDefUnknownVar
+
+funcDefWrongTypeInBody :: Expectation
+funcDefWrongTypeInBody =
+  typeOf
+    (DefType (FunctionDef (FunctionDefinition
+      "bad" [("x", KInt)] KInt
+      [Letters (Variable "x")])))
+    initialTypeEnv
+    `shouldBe` Left (TypeError
+      "letters() only works on text, but I got a wholeNumber.")
+
+typeCheckFuncDefWrongTypeInBody :: SpecWith ()
+typeCheckFuncDefWrongTypeInBody =
+  describe "typeOf" $
+    context "when a function body uses a parameter with the wrong type" $
+      it "should fail with a type error" funcDefWrongTypeInBody
+
+funcDefEmptyBodyVoid :: Expectation
+funcDefEmptyBodyVoid =
+  typeOf
+    (DefType (FunctionDef (FunctionDefinition "nothing" [] KVoid [])))
+    initialTypeEnv
+    `shouldBe` Right KVoid
+
+typeCheckFuncDefEmptyBodyVoid :: SpecWith ()
+typeCheckFuncDefEmptyBodyVoid =
+  describe "typeOf" $
+    context "when a function has an empty body and KVoid return type" $
+      it "should succeed with KVoid" funcDefEmptyBodyVoid
+
+funcDefEmptyBodyMismatch :: Expectation
+funcDefEmptyBodyMismatch =
+  typeOf
+    (DefType (FunctionDef (FunctionDefinition "bad" [] KInt [])))
+    initialTypeEnv
+    `shouldBe` Left (TypeError
+      "The function 'bad' says it returns a wholeNumber, but there's nothing in the body.")
+
+typeCheckFuncDefEmptyBodyMismatch :: SpecWith ()
+typeCheckFuncDefEmptyBodyMismatch =
+  describe "typeOf" $
+    context "when a function has an empty body but a non-void return type" $
+      it "should fail with a type error" funcDefEmptyBodyMismatch
+
+-- Call tests
+
+funcCallHappyPath :: Expectation
+funcCallHappyPath =
+  typeOf (Call (FunctionCall "double" [IntLit 5])) envWithDouble
+    `shouldBe` Right KInt
+
+typeCheckFuncCallHappyPath :: SpecWith ()
+typeCheckFuncCallHappyPath =
+  describe "typeOf" $
+    context "when calling a function with the correct argument type" $
+      it "should return the function's return type" funcCallHappyPath
+
+funcCallExprArg :: Expectation
+funcCallExprArg =
+  typeOf (Call (FunctionCall "double" [Expr Add (IntLit 1) (IntLit 2)])) envWithDouble
+    `shouldBe` Right KInt
+
+typeCheckFuncCallExprArg :: SpecWith ()
+typeCheckFuncCallExprArg =
+  describe "typeOf" $
+    context "when calling a function with an expression as an argument" $
+      it "should type check the argument expression" funcCallExprArg
+
+funcCallMultipleParams :: Expectation
+funcCallMultipleParams =
+  typeOf (Call (FunctionCall "add" [IntLit 1, IntLit 2])) envWithAdd
+    `shouldBe` Right KInt
+
+typeCheckFuncCallMultipleParams :: SpecWith ()
+typeCheckFuncCallMultipleParams =
+  describe "typeOf" $
+    context "when calling a function with multiple arguments" $
+      it "should check all arguments and return the return type" funcCallMultipleParams
+
+funcCallWrongArgType :: Expectation
+funcCallWrongArgType =
+  typeOf (Call (FunctionCall "double" [BoolLit True])) envWithDouble
+    `shouldBe` Left (TypeError
+      "The input to double should be a wholeNumber, but I got a truth.")
+
+typeCheckFuncCallWrongArgType :: SpecWith ()
+typeCheckFuncCallWrongArgType =
+  describe "typeOf" $
+    context "when calling a function with the wrong argument type" $
+      it "should fail with a type error" funcCallWrongArgType
+
+funcCallTooFewArgs :: Expectation
+funcCallTooFewArgs =
+  typeOf (Call (FunctionCall "double" [])) envWithDouble
+    `shouldBe` Left (TypeError
+      "double needs 1 input, but you didn't give it any.")
+
+typeCheckFuncCallTooFewArgs :: SpecWith ()
+typeCheckFuncCallTooFewArgs =
+  describe "typeOf" $
+    context "when calling a function with too few arguments" $
+      it "should fail with a type error" funcCallTooFewArgs
+
+funcCallTooManyArgs :: Expectation
+funcCallTooManyArgs =
+  typeOf (Call (FunctionCall "double" [IntLit 1, IntLit 2])) envWithDouble
+    `shouldBe` Left (TypeError
+      "double needs 1 input, but you gave it 2.")
+
+typeCheckFuncCallTooManyArgs :: SpecWith ()
+typeCheckFuncCallTooManyArgs =
+  describe "typeOf" $
+    context "when calling a function with too many arguments" $
+      it "should fail with a type error" funcCallTooManyArgs
+
+funcCallUndefined :: Expectation
+funcCallUndefined =
+  typeOf (Call (FunctionCall "unknown" [IntLit 1])) initialTypeEnv
+    `shouldBe` Left (UndefinedError
+      "I don't know a function called unknown — did you define it?")
+
+typeCheckFuncCallUndefined :: SpecWith ()
+typeCheckFuncCallUndefined =
+  describe "typeOf" $
+    context "when calling a function that hasn't been defined" $
+      it "should fail with an undefined error" funcCallUndefined

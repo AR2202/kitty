@@ -1,10 +1,35 @@
 
   ---
   Kitty Type Checker: Improvement Plan
-  
-  
+
+
   ---
-  2. unifyTypeEnvs workaround still in place — TypeChecker.hs (Medium)
+  Completed
+
+  The following items from the original plan have been implemented:
+
+  - ToText now validates that its input is a convertible type (KInt, KFloat, KBool, KChar, KString)
+  - ToNum now validates that its input is KString; dead unreachable fallthrough case removed
+  - Letters now accepts any expression of type KString, not just string literals
+  - Pop rewritten to reason about the result type rather than the AST shape;
+    handles all list expressions, not just literals and bare variables
+  - Push error message now correctly interpolates the existing list element type
+  - UnwrapAs now narrows the unwrapped variable to wantedType inside the block
+  - Suspicious unused imports removed (Control.Exception, Foreign.C, etc.)
+  - Two remaining stale imports removed (void from Control.Monad, Data.Bits)
+  - BuiltIn removed from KittyAST entirely
+  - All error messages rewritten for a child audience
+  - Function definition type checking implemented: parameters in scope, body type
+    checked against declared return type, registered in _functionTypes on success
+  - Function call type checking implemented: argument count and types checked,
+    child-friendly error messages for all failure cases
+  - 14 function type checker tests added to Spec.hs (all passing)
+
+  ---
+  Outstanding Issues
+
+  ---
+  1. unifyTypeEnvs workaround still in place — TypeChecker.hs (Medium)
 
   The current implementation:
 
@@ -30,73 +55,7 @@
           | otherwise = OneOf a b  -- different: create union
 
   ---
-  3. Function definition and call type checking — (Hard, blocked on KittyTypes)
-
-  The type checker returns "not yet implemented" for both function definitions and
-  calls. This cannot be properly fixed in the type checker alone — the data types
-  in KittyTypes.hs do not carry enough information:
-
-    -- call args are variable names only, not expressions
-    data FunctionCall = FunctionCall String [String]
-
-    -- no parameter types, no return type
-    data FunctionDefinition = FunctionDefinition
-      { _funcName   :: String
-      , _funcParams :: [String]
-      , _funcBody   :: [KittyAST]
-      }
-
-  Required changes to KittyTypes.hs first:
-
-    data FunctionCall = FunctionCall String [KittyAST]  -- args as expressions
-
-    data FunctionDefinition = FunctionDefinition
-      { _funcName    :: String
-      , _funcParams  :: [(String, KType)]  -- names with types
-      , _funcRetType :: KType              -- declared return type
-      , _funcBody    :: [KittyAST]
-      }
-
-  Once KittyTypes is updated, the type checker logic:
-
-  For definitions — register the KFun type, build a local env with params in scope,
-  check the body, verify the return type matches:
-
-    typeOf (DefType (FunctionDef (FunctionDefinition name params retType body))) env = do
-      let paramEnv = foldl (\e (n, t) -> e {_varTypes = M.insert n t (_varTypes e)}) env params
-      bodyType <- checkBlockType body paramEnv
-      if bodyType == retType
-        then Right KVoid
-        else Left $ TypeError
-          ("function " <> name <> " declares return type " <> show retType <>
-           " but body has type " <> show bodyType)
-
-  For calls — look up the function type, check argument count and types:
-
-    typeOf (Call (FunctionCall name args)) env = do
-      funType <- case M.lookup name (_functionTypes env) of
-        Nothing -> Left $ UndefinedError ("no function named " ++ name)
-        Just t  -> Right t
-      case funType of
-        KFun (paramTypes, [retType]) -> do
-          argTypes <- mapM (`typeOf` env) args
-          if length argTypes /= length paramTypes
-            then Left $ TypeError ("wrong number of arguments to " ++ name)
-            else case filter (\(g,e) -> g /= e) (zip argTypes paramTypes) of
-              []          -> Right retType
-              (got,ex):_ -> Left $ TypeError
-                ("argument type mismatch in call to " ++ name ++
-                 ": expected " ++ show ex ++ " but got " ++ show got)
-        _ -> Left $ TypeError (name ++ " is not a function")
-
-  This change also requires parser support for function definition syntax and
-  typed parameter lists.
-
-  Note: explicit type annotations on parameters means Hindley-Milner is not
-  needed for this step. See the HM section below for when it becomes necessary.
-
-  ---
-  4. Double parsing in the REPL — REPL.hs (Medium)
+  2. Double parsing in the REPL — REPL.hs (Medium)
 
   The interactive REPL path parses the input text twice: once inside updateTypeEnv
   and again inside parseReplT. The type checker and evaluator see independent parse
@@ -109,7 +68,7 @@
   This is structurally enforced by the Typed AST pattern (see design section below).
 
   ---
-  5. evalFile command uses empty type environment — REPL.hs line 54 (Low)
+  3. evalFile command uses empty type environment — REPL.hs line 54 (Low)
 
   The evalFile command type-checks against initialTypeEnv (the empty environment),
   not the current session's tenv. A file cannot reference variables defined in the
@@ -119,7 +78,7 @@
   This may be intentional isolation, but is worth a conscious decision.
 
   ---
-  6. Exported evaluator functions bypass type checking — Evaluator.hs (Low)
+  4. Exported evaluator functions bypass type checking — Evaluator.hs (Low)
 
   Several exported functions skip the type checker entirely:
 
@@ -136,12 +95,10 @@
 
   Priority  Change                                        Difficulty
   --------  --------------------------------------------  ----------
-  1         Remove two remaining stale imports            Trivial
-  2         Fix unifyTypeEnvs to avoid OneOf t t          Medium
-  3         Fix double parsing in the REPL               Medium
-  4         Decide on evalFile session isolation          Low
-  5         Guard or remove unguarded evaluator exports  Low
-  6         Function definition + call type checking     Hard (needs KittyTypes changes first)
+  1         Fix unifyTypeEnvs to avoid OneOf t t          Medium
+  2         Fix double parsing in the REPL               Medium
+  3         Decide on evalFile session isolation          Low
+  4         Guard or remove unguarded evaluator exports  Low
 
   ---
   Design notes — for reference
@@ -269,9 +226,9 @@
   ---
   Recommendation for Kitty
 
-  1. Add functions with explicit type annotations on parameters and return type.
-     This requires no new theory — just extend the type environment with parameter
-     types and check the body. Requires KittyTypes and parser changes first.
+  1. ✓ Functions with explicit type annotations implemented. KittyTypes updated,
+     type checker handles definitions and calls, 14 tests passing.
+     Next: parser support for function definition syntax.
 
   2. Hold off on HM. Polymorphism is conceptually tricky for beginners anyway.
 

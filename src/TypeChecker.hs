@@ -320,14 +320,41 @@ checkBlockType statements env =
 
 instance TypeCheckable FunctionCall where
   typeOf :: FunctionCall -> TypeEnv -> Either KittyError KType
-  typeOf (FunctionCall fnName fnParams) env =
+  typeOf (FunctionCall fnName args) env =
     case M.lookup fnName (_functionTypes env) of
-      Nothing -> Left $ UndefinedError ("I don't know a function called " ++ fnName ++ " — did you define it?")
-      Just _  -> Left $ UndefinedError "not yet implemented"
+      Nothing -> Left $ UndefinedError
+        ("I don't know a function called " ++ fnName ++ " — did you define it?")
+      Just (KFun (paramTypes, [retType])) ->
+        if length args /= length paramTypes
+          then Left $ TypeError (argCountError fnName (length paramTypes) (length args))
+          else do
+            argTypes <- mapM (`typeOf` env) args
+            case filter (\(got, expected) -> got /= expected) (zip argTypes paramTypes) of
+              []               -> Right retType
+              (got, expected):_ -> Left $ TypeError
+                ( "The input to " ++ fnName ++ " should be a " ++ show expected
+                    ++ ", but I got a " ++ show got ++ "."
+                )
+      Just _ -> Left $ TypeError (fnName ++ " is not a function.")
 
 instance TypeCheckable Definition where
   typeOf (AssignDef varname e) env = typeOf e env
-  typeOf _ _ = Left $ UndefinedError "not yet implemented"
+  typeOf (FunctionDef (FunctionDefinition name params retType body)) env = do
+    let paramEnv = foldl
+          (\e (pName, pType) -> e {_varTypes = M.insert pName pType (_varTypes e)})
+          env params
+    bodyType <- checkBlockType body paramEnv
+    if bodyType == retType
+      then Right KVoid
+      else if null body
+        then Left $ TypeError
+          ( "The function '" ++ name ++ "' says it returns a " ++ show retType
+              ++ ", but there's nothing in the body."
+          )
+        else Left $ TypeError
+          ( "The function '" ++ name ++ "' says it returns a " ++ show retType
+              ++ ", but the body gives back a " ++ show bodyType ++ "."
+          )
 
 {-type checking functions functions-}
 
@@ -360,13 +387,15 @@ updateTypeEnv tenv text =
     Right (DefType (AssignDef varname e)) ->
       case typeCheck tenv text of
         Right t ->
-          Right
-            ( tenv
-                { _varTypes = M.insert varname t (_varTypes tenv)
-                },
-              t
-            )
+          Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)}, t)
         Left err -> Left err
+    Right (DefType (FunctionDef fd)) ->
+      case typeOf (DefType (FunctionDef fd)) tenv of
+        Right KVoid ->
+          let funType = KFun (map snd (_funcParams fd), [_funcRetType fd])
+          in Right (tenv {_functionTypes = M.insert (_funcName fd) funType (_functionTypes tenv)}, KVoid)
+        Left err -> Left err
+        Right _   -> Left $ UndefinedError "unexpected return type from function definition"
     Right (If c e) ->
       case typeCheck tenv text of
         Right t ->
@@ -446,6 +475,13 @@ updateTypeEnv' tenv (DefType (AssignDef varname e)) =
   case typeOf e tenv of
     Right t  -> Right (tenv {_varTypes = M.insert varname t (_varTypes tenv)})
     Left err -> Left err
+updateTypeEnv' tenv (DefType (FunctionDef fd)) =
+  case typeOf (DefType (FunctionDef fd)) tenv of
+    Right KVoid ->
+      let funType = KFun (map snd (_funcParams fd), [_funcRetType fd])
+      in Right (tenv {_functionTypes = M.insert (_funcName fd) funType (_functionTypes tenv)})
+    Left err -> Left err
+    Right _  -> Left $ UndefinedError "unexpected return type from function definition"
 updateTypeEnv' tenv e = case typeOf e tenv of
   Right _  -> Right tenv
   Left err -> Left err
@@ -456,3 +492,15 @@ updateTypeEnv' tenv e = case typeOf e tenv of
 showUnwrapped :: (Show a, Show b) => Either a b -> String
 showUnwrapped (Left x)  = show x
 showUnwrapped (Right y) = show y
+
+-- | builds the wrong-argument-count error message
+argCountError :: String -> Int -> Int -> String
+argCountError name expected given =
+  name ++ " needs " ++ show expected ++ inputs expected ++ suffix
+  where
+    inputs 1 = " input"
+    inputs _ = " inputs"
+    suffix
+      | given == 0           = ", but you didn't give it any."
+      | given < expected     = ", but you only gave it " ++ show given ++ "."
+      | otherwise            = ", but you gave it " ++ show given ++ "."
